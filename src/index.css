@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --card: 0 0% 100%; }
+.card { @apply rounded-xl shadow p-4 bg-white; }
+.btn  { @apply px-3 py-1.5 rounded border bg-slate-900 text-white hover:bg-slate-800; }
+.input{ @apply px-3 py-2 rounded border w-full; }
+.select{ @apply px-2 py-1 rounded border bg-white; }
+.badge{ @apply inline-block px-2 py-0.5 text-xs rounded bg-slate-100; }
