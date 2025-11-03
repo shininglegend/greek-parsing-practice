@@ -2,7 +2,7 @@ import type { Verse, Word, ParseFields } from "./types";
 
 // MorphGNT verse lookup + verse JSON.
 // If the service is unavailable, a tiny fallback for Jn 1:1 is provided.
-const BASE = "https://api.morphgnt.org/v0";
+const BASE = "https://api.morphgnt.org";
 
 async function fetchJSON<T>(url: string): Promise<T> {
   const r = await fetch(url);
@@ -11,68 +11,141 @@ async function fetchJSON<T>(url: string): Promise<T> {
 }
 
 type MorphWord = {
-  surface: string;
+  "@id"?: string;
+  text: string;
+  word?: string;
+  crit_text?: string;
   lemma?: string;
-  parse?: Partial<ParseFields> | string; // some feeds use compact codes
-  id?: string;
+  pos?: string;
+  case?: string;
+  number?: string;
+  gender?: string;
+  tense?: string;
+  voice?: string;
+  mood?: string;
+  person?: string;
 };
 
 type MorphVerse = {
-  id: string;
-  ref: string;
+  "@id": string;
+  title: string;
   words: MorphWord[];
 };
 
-function decodeParse(p: unknown): Partial<ParseFields> | undefined {
-  if (!p) return undefined;
-  if (typeof p === "object" && p !== null) return p as Partial<ParseFields>;
-  if (typeof p !== "string") return undefined;
-  // naive decoder for compact tags like "noun,nom,sg,masc"
-  const parts = p.split(/[.,;:/ ]+/).map(s => s.trim().toLowerCase());
+type VerseLookupResponse = {
+  verse_id: string;
+};
+
+// Map MorphGNT single-letter codes to our internal format
+const POS_MAP: Record<string, string> = {
+  'N': 'noun',
+  'V': 'verb',
+  'RA': 'article',
+  'RD': 'pron',
+  'RR': 'pron',
+  'RP': 'pron',
+  'P': 'prep',
+  'C': 'conj',
+  'D': 'adv',
+  'A': 'adj',
+  'I': 'interj',
+  'X': 'part'
+};
+
+const CASE_MAP: Record<string, string> = {
+  'N': 'nom',
+  'G': 'gen',
+  'D': 'dat',
+  'A': 'acc',
+  'V': 'voc'
+};
+
+const NUMBER_MAP: Record<string, string> = {
+  'S': 'sg',
+  'P': 'pl'
+};
+
+const GENDER_MAP: Record<string, string> = {
+  'M': 'masc',
+  'F': 'fem',
+  'N': 'neut'
+};
+
+const TENSE_MAP: Record<string, string> = {
+  'P': 'pres',
+  'I': 'impf',
+  'F': 'fut',
+  'A': 'aor',
+  'X': 'perf',
+  'Y': 'plup'
+};
+
+const VOICE_MAP: Record<string, string> = {
+  'A': 'act',
+  'M': 'mid',
+  'P': 'pass'
+};
+
+const MOOD_MAP: Record<string, string> = {
+  'I': 'ind',
+  'S': 'subj',
+  'O': 'opt',
+  'N': 'inf',
+  'P': 'part',
+  'M': 'impv'
+};
+
+function decodeParse(w: MorphWord): Partial<ParseFields> | undefined {
   const fields: Partial<ParseFields> = {};
-  for (const token of parts) {
-    if (["noun","verb","adj","adv","prep","pron","conj","part","article"].includes(token)) fields.pos = token;
-    else if (["nom","gen","dat","acc","voc"].includes(token)) fields.case = token;
-    else if (["sg","pl"].includes(token)) fields.number = token;
-    else if (["masc","fem","neut"].includes(token)) fields.gender = token;
-    else if (["pres","impf","fut","aor","perf","plup"].includes(token)) fields.tense = token;
-    else if (["act","mid","pass","mp"].includes(token)) fields.voice = token;
-    else if (["ind","impv","subj","opt","inf","part"].includes(token)) fields.mood = token;
-    else if (["1","2","3"].includes(token)) fields.person = token;
-  }
-  return fields;
+  
+  if (w.pos && POS_MAP[w.pos]) fields.pos = POS_MAP[w.pos];
+  if (w.case && CASE_MAP[w.case]) fields.case = CASE_MAP[w.case];
+  if (w.number && NUMBER_MAP[w.number]) fields.number = NUMBER_MAP[w.number];
+  if (w.gender && GENDER_MAP[w.gender]) fields.gender = GENDER_MAP[w.gender];
+  if (w.tense && TENSE_MAP[w.tense]) fields.tense = TENSE_MAP[w.tense];
+  if (w.voice && VOICE_MAP[w.voice]) fields.voice = VOICE_MAP[w.voice];
+  if (w.mood && MOOD_MAP[w.mood]) fields.mood = MOOD_MAP[w.mood];
+  if (w.person) fields.person = w.person;
+  
+  return Object.keys(fields).length > 0 ? fields : undefined;
 }
 
 function mapVerse(mv: MorphVerse): Verse {
   const words: Word[] = mv.words.map((w, i) => ({
-    surface: w.surface,
+    surface: w.text || w.word || w.crit_text || "",
     lemma: w.lemma,
-    parse: decodeParse(w.parse),
-    id: w.id ?? `${mv.id}-${i}`
+    parse: decodeParse(w),
+    id: w["@id"] ?? `${mv["@id"]}-${i}`
   }));
-  return { ref: mv.ref, words };
+  return { ref: mv.title, words };
 }
 
 export async function loadVerse(ref: string): Promise<Verse> {
   // 1) lookup verse id
   const q = encodeURIComponent(ref);
   try {
-    const ids = await fetchJSON<string[]>(`${BASE}/verse-lookup/?${q}`);
-    if (!ids?.length) throw new Error("verse id not found");
-    const vjson = await fetchJSON<MorphVerse>(`${BASE}/verse/${ids[0]}.json`);
+    const lookup = await fetchJSON<VerseLookupResponse>(`${BASE}/v0/verse-lookup/?${q}`);
+    if (!lookup?.verse_id) throw new Error("verse id not found");
+    
+    // 2) fetch the actual verse data using the returned verse_id
+    const verseUrl = `${BASE}${lookup.verse_id}`;
+    const vjson = await fetchJSON<MorphVerse>(verseUrl);
     return mapVerse(vjson);
-  } catch {
-    // fallback: Jn 1:1 minimal demo
-    if (/^jn\s*1[:.]1$/i.test(ref)) {
+  } catch (err) {
+    console.error("API fetch failed:", err);
+    // fallback: Jn 1:2 minimal demo matching the structure from the API
+    if (/^jn\s*1[:.]2$/i.test(ref) || /^john\s*1[:.]2$/i.test(ref)) {
       const fallback: MorphVerse = {
-        id: "Jn.1.1",
-        ref: "Jn 1:1",
-        words: [
-          { surface: "Ἐν", lemma: "ἐν", parse: "prep" },
-          { surface: "ἀρχῇ", lemma: "ἀρχή", parse: "noun,dat,sg,fem" },
-          { surface: "ἦν", lemma: "εἰμί", parse: "verb,impf,act,ind,3" },
-          { surface: "ὁ", lemma: "ὁ", parse: "article,nom,sg,masc" },
-          { surface: "λόγος", lemma: "λόγος", parse: "noun,nom,sg,masc" }
+        "@id": "/v0/verse/640102.json",
+        "title": "John 1.2",
+        "words": [
+          { text: "οὗτος", lemma: "οὗτος", pos: "RD", case: "N", number: "S", gender: "M" },
+          { text: "ἦν", lemma: "εἰμί", pos: "V", person: "3", tense: "I", voice: "A", mood: "I", number: "S" },
+          { text: "ἐν", lemma: "ἐν", pos: "P" },
+          { text: "ἀρχῇ", lemma: "ἀρχή", pos: "N", case: "D", number: "S", gender: "F" },
+          { text: "πρὸς", lemma: "πρός", pos: "P" },
+          { text: "τὸν", lemma: "ὁ", pos: "RA", case: "A", number: "S", gender: "M" },
+          { text: "θεόν", lemma: "θεός", pos: "N", case: "A", number: "S", gender: "M" }
         ]
       };
       return mapVerse(fallback);
