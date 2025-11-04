@@ -11,6 +11,7 @@ interface VerseSelectorProps {
   surfaceLine: string;
   loading?: boolean;
   error?: string;
+  hideVerse?: boolean;
 }
 
 export function VerseSelector({
@@ -23,7 +24,8 @@ export function VerseSelector({
   onLoad,
   surfaceLine,
   loading,
-  error
+  error,
+  hideVerse
 }: VerseSelectorProps) {
   return (
     <div className="card flex flex-col gap-3">
@@ -56,9 +58,11 @@ export function VerseSelector({
         />
         <button className="btn" onClick={onLoad}>Load</button>
       </div>
-      <div className="text-sm text-slate-700">
-        Verse: <span className="font-mono">{surfaceLine}</span>
-      </div>
+      {!hideVerse && (
+        <div className="text-sm text-slate-700">
+          Verse: <span className="font-mono">{surfaceLine}</span>
+        </div>
+      )}
       {loading && <div className="text-sm">Loading…</div>}
       {error && <div className="text-sm text-red-700">Error: {error}</div>}
     </div>

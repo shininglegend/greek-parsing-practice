@@ -58,3 +58,7 @@ npm run preview
 ## Data Sources
 
 Currently uses the MorphGNT API (`https://api.morphgnt.org/v0`) for morphological data. The architecture supports swapping data sources through the adapter layer in `api.ts`
+
+
+Great. 
+Now, another. Users likely don't always want to parse all the words all the time. Update VerseSelector to have the verse text be a bit bigger, and have users select the words they want to parse. 
