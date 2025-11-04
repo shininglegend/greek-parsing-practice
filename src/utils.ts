@@ -129,3 +129,28 @@ export function formatRef(book: string, chapter: string, verse: string): string 
   
   return `${bookAbbrev} ${chap}:${v}`;
 }
+
+// Define which fields are relevant for each part of speech
+type FieldKey = keyof ParseFields;
+
+export const RELEVANT_FIELDS: Record<string, FieldKey[]> = {
+  noun: ["case", "number", "gender"],
+  verb: ["tense", "voice", "mood", "person", "number"],
+  adjective: ["case", "number", "gender"],
+  pronoun: ["case", "number", "gender", "person"],
+  article: ["case", "number", "gender"],
+  participle: ["tense", "voice", "case", "number", "gender"],
+  adverb: [],
+  preposition: [],
+  conjunction: [],
+  particle: [],
+};
+
+export function isFieldRelevant(pos: string | undefined, field: FieldKey): boolean {
+  if (!pos) return true; // Show all fields if no POS selected
+  const normalized = normalizeMissing(pos);
+  if (!normalized) return true;
+  const relevantFields = RELEVANT_FIELDS[normalized];
+  if (!relevantFields) return true; // Unknown POS, show all
+  return relevantFields.includes(field);
+}
