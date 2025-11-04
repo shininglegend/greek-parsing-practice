@@ -1,4 +1,5 @@
 import { NT_BOOKS } from "../utils";
+import type { Word } from "../types";
 
 interface VerseSelectorProps {
   selectedBook: string;
@@ -12,6 +13,9 @@ interface VerseSelectorProps {
   loading?: boolean;
   error?: string;
   hideVerse?: boolean;
+  words?: Word[];
+  selectedWordIds?: Set<string>;
+  onWordToggle?: (wordId: string) => void;
 }
 
 export function VerseSelector({
@@ -25,8 +29,14 @@ export function VerseSelector({
   surfaceLine,
   loading,
   error,
-  hideVerse
+  hideVerse,
+  words,
+  selectedWordIds,
+  onWordToggle
 }: VerseSelectorProps) {
+  const hasWords = words && words.length > 0;
+  const showWordSelection = hasWords && onWordToggle && selectedWordIds;
+  
   return (
     <div className="card flex flex-col gap-3">
       <div className="flex gap-2 flex-wrap">
@@ -58,11 +68,59 @@ export function VerseSelector({
         />
         <button className="btn" onClick={onLoad}>Load</button>
       </div>
-      {!hideVerse && (
-        <div className="text-sm text-slate-700">
-          Verse: <span className="font-mono">{surfaceLine}</span>
+      
+      {!hideVerse && showWordSelection && (
+        <>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-600 font-medium">
+              Click words to select/deselect for parsing:
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => words.forEach(w => !selectedWordIds.has(w.id) && onWordToggle(w.id))}
+                className="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-50"
+              >
+                Select All
+              </button>
+              <button 
+                onClick={() => words.forEach(w => selectedWordIds.has(w.id) && onWordToggle(w.id))}
+                className="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-50"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xl leading-relaxed">
+            {words.map((w) => {
+              const isSelected = selectedWordIds.has(w.id);
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => onWordToggle(w.id)}
+                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer border-2 ${
+                    isSelected 
+                      ? "bg-blue-100 border-blue-500 text-blue-900 font-semibold" 
+                      : "bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100"
+                  }`}
+                  title={`${w.surface} (${w.lemma || "unknown"})`}
+                >
+                  {w.surface}
+                </button>
+              );
+            })}
+          </div>
+          <div className="text-xs text-slate-500">
+            {selectedWordIds.size} of {words.length} words selected
+          </div>
+        </>
+      )}
+      
+      {!hideVerse && !showWordSelection && (
+        <div className="text-base text-slate-700">
+          <span className="font-mono text-lg">{surfaceLine}</span>
         </div>
       )}
+      
       {loading && <div className="text-sm">Loading…</div>}
       {error && <div className="text-sm text-red-700">Error: {error}</div>}
     </div>
