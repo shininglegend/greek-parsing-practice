@@ -9,8 +9,8 @@ export const MORPHOLOGY_CHARTS = {
           ["Nominative", "ὁ", "ἡ", "τό"],
           ["Genitive", "τοῦ", "τῆς", "τοῦ"],
           ["Dative", "τῷ", "τῇ", "τῷ"],
-          ["Accusative", "τόν", "τήν", "τό"]
-        ]
+          ["Accusative", "τόν", "τήν", "τό"],
+        ],
       },
       {
         subtitle: "Plural",
@@ -19,24 +19,24 @@ export const MORPHOLOGY_CHARTS = {
           ["Nominative", "οἱ", "αἱ", "τά"],
           ["Genitive", "τῶν", "τῶν", "τῶν"],
           ["Dative", "τοῖς", "ταῖς", "τοῖς"],
-          ["Accusative", "τούς", "τάς", "τά"]
-        ]
-      }
-    ]
+          ["Accusative", "τούς", "τάς", "τά"],
+        ],
+      },
+    ],
   },
   firstDeclension: {
     title: "First Declension Nouns (mostly feminine)",
     tables: [
       {
-        subtitle: "ἡ ἡμέρα (day) - α-stem",
+        subtitle: "ἡ γλῶσσα (tongue) - α-stem after ρ, ε, ι",
         headers: ["Case", "Singular", "Plural"],
         rows: [
-          ["Nominative", "ἡμέρα", "ἡμέραι"],
-          ["Genitive", "ἡμέρας", "ἡμερῶν"],
-          ["Dative", "ἡμέρᾳ", "ἡμέραις"],
-          ["Accusative", "ἡμέραν", "ἡμέρας"],
-          ["Vocative", "ἡμέρα", "ἡμέραι"]
-        ]
+          ["Nominative", "γλῶσσα", "γλῶσσαι"],
+          ["Genitive", "γλώσσης", "γλωσσῶν"],
+          ["Dative", "γλώσσῃ", "γλώσσαις"],
+          ["Accusative", "γλῶσσαν", "γλώσσας"],
+          ["Vocative", "γλῶσσα", "γλῶσσαι"],
+        ],
       },
       {
         subtitle: "ἡ γλῶσσα (tongue) - η-stem after ρ, ε, ι",
@@ -46,10 +46,10 @@ export const MORPHOLOGY_CHARTS = {
           ["Genitive", "γλώσσης", "γλωσσῶν"],
           ["Dative", "γλώσσῃ", "γλώσσαις"],
           ["Accusative", "γλῶσσαν", "γλώσσας"],
-          ["Vocative", "γλῶσσα", "γλῶσσαι"]
-        ]
-      }
-    ]
+          ["Vocative", "γλῶσσα", "γλῶσσαι"],
+        ],
+      },
+    ],
   },
   secondDeclension: {
     title: "Second Declension Nouns",
@@ -62,8 +62,8 @@ export const MORPHOLOGY_CHARTS = {
           ["Genitive", "λόγου", "λόγων"],
           ["Dative", "λόγῳ", "λόγοις"],
           ["Accusative", "λόγον", "λόγους"],
-          ["Vocative", "λόγε", "λόγοι"]
-        ]
+          ["Vocative", "λόγε", "λόγοι"],
+        ],
       },
       {
         subtitle: "τὸ δῶρον (gift) - Neuter",
@@ -73,10 +73,10 @@ export const MORPHOLOGY_CHARTS = {
           ["Genitive", "δώρου", "δώρων"],
           ["Dative", "δώρῳ", "δώροις"],
           ["Accusative", "δῶρον", "δῶρα"],
-          ["Vocative", "δῶρον", "δῶρα"]
-        ]
-      }
-    ]
+          ["Vocative", "δῶρον", "δῶρα"],
+        ],
+      },
+    ],
   },
   thirdDeclension: {
     title: "Third Declension Nouns",
@@ -89,8 +89,8 @@ export const MORPHOLOGY_CHARTS = {
           ["Genitive", "σαρκός", "σαρκῶν"],
           ["Dative", "σαρκί", "σαρξί(ν)"],
           ["Accusative", "σάρκα", "σάρκας"],
-          ["Vocative", "σάρξ", "σάρκες"]
-        ]
+          ["Vocative", "σάρξ", "σάρκες"],
+        ],
       },
       {
         subtitle: "ἡ πόλις (city) - Vowel stem",
@@ -100,10 +100,10 @@ export const MORPHOLOGY_CHARTS = {
           ["Genitive", "πόλεως", "πόλεων"],
           ["Dative", "πόλει", "πόλεσι(ν)"],
           ["Accusative", "πόλιν", "πόλεις"],
-          ["Vocative", "πόλι", "πόλεις"]
-        ]
-      }
-    ]
+          ["Vocative", "πόλι", "πόλεις"],
+        ],
+      },
+    ],
   },
   presentActive: {
     title: "Present Active Indicative (λύω - I loose)",
@@ -112,12 +112,12 @@ export const MORPHOLOGY_CHARTS = {
         subtitle: "Singular & Plural",
         headers: ["Person", "Singular", "Plural"],
         rows: [
-          ["1st", "λύω (I loose)", "λύομεν (we loose)"],
-          ["2nd", "λύεις (you loose)", "λύετε (you loose)"],
-          ["3rd", "λύει (he/she/it looses)", "λύουσι(ν) (they loose)"]
-        ]
-      }
-    ]
+          ["1st", "λύομαι", "λυόμεθα"],
+          ["2nd", "λύῃ", "λύεσθε"],
+          ["3rd", "λύεται", "λύονται"],
+        ],
+      },
+    ],
   },
   imperfectActive: {
     title: "Imperfect Active Indicative (ἔλυον - I was loosing)",
@@ -128,10 +128,10 @@ export const MORPHOLOGY_CHARTS = {
         rows: [
           ["1st", "ἔλυον", "ἐλύομεν"],
           ["2nd", "ἔλυες", "ἐλύετε"],
-          ["3rd", "ἔλυε(ν)", "ἔλυον"]
-        ]
-      }
-    ]
+          ["3rd", "ἔλυε(ν)", "ἔλυον"],
+        ],
+      },
+    ],
   },
   futureActive: {
     title: "Future Active Indicative (λύσω - I will loose)",
@@ -142,10 +142,10 @@ export const MORPHOLOGY_CHARTS = {
         rows: [
           ["1st", "λύσω", "λύσομεν"],
           ["2nd", "λύσεις", "λύσετε"],
-          ["3rd", "λύσει", "λύσουσι(ν)"]
-        ]
-      }
-    ]
+          ["3rd", "λύσει", "λύσουσι(ν)"],
+        ],
+      },
+    ],
   },
   aoristActive: {
     title: "Aorist Active Indicative (ἔλυσα - I loosed)",
@@ -156,10 +156,10 @@ export const MORPHOLOGY_CHARTS = {
         rows: [
           ["1st", "ἔλυσα", "ἐλύσαμεν"],
           ["2nd", "ἔλυσας", "ἐλύσατε"],
-          ["3rd", "ἔλυσε(ν)", "ἔλυσαν"]
-        ]
-      }
-    ]
+          ["3rd", "ἔλυσε(ν)", "ἔλυσαν"],
+        ],
+      },
+    ],
   },
   perfectActive: {
     title: "Perfect Active Indicative (λέλυκα - I have loosed)",
@@ -170,10 +170,10 @@ export const MORPHOLOGY_CHARTS = {
         rows: [
           ["1st", "λέλυκα", "λελύκαμεν"],
           ["2nd", "λέλυκας", "λελύκατε"],
-          ["3rd", "λέλυκε(ν)", "λελύκασι(ν)"]
-        ]
-      }
-    ]
+          ["3rd", "λέλυκε(ν)", "λελύκασι(ν)"],
+        ],
+      },
+    ],
   },
   middlePassive: {
     title: "Present Middle/Passive Indicative (λύομαι)",
@@ -184,9 +184,9 @@ export const MORPHOLOGY_CHARTS = {
         rows: [
           ["1st", "λύομαι", "λυόμεθα"],
           ["2nd", "λύῃ/λύει", "λύεσθε"],
-          ["3rd", "λύεται", "λύονται"]
-        ]
-      }
-    ]
-  }
+          ["3rd", "λύεται", "λύονται"],
+        ],
+      },
+    ],
+  },
 };
