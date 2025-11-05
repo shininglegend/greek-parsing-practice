@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadVerse } from "../api";
 import { formatRef, FIELD_SPECS } from "../utils";
-import { VerseSelector } from "./VerseSelector";
+import { VerseSelector, Modal, GrammarGuide, MorphologyCharts } from "./";
 import type { Verse, Word } from "../types";
 
 type State =
@@ -20,6 +20,8 @@ export function ReverseParser() {
   const [ignoreAccents, setIgnoreAccents] = useState(false);
   const [ignoreBreathing, setIgnoreBreathing] = useState(false);
   const [ignoreCase, setIgnoreCase] = useState(false);
+  const [showGrammarGuide, setShowGrammarGuide] = useState(false);
+  const [showMorphologyCharts, setShowMorphologyCharts] = useState(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
 
   function load() {
@@ -115,8 +117,20 @@ export function ReverseParser() {
 
   return (
     <div className="mx-auto max-w-7xl p-4 space-y-4">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 flex-wrap">
         <h1 className="text-2xl font-bold">Reverse Parser</h1>
+        <button
+          onClick={() => setShowMorphologyCharts(true)}
+          className="btn text-sm"
+        >
+          Morphology Charts
+        </button>
+        <button
+          onClick={() => setShowGrammarGuide(true)}
+          className="btn text-sm"
+        >
+          Grammar Guide
+        </button>
         <a
           href="#/"
           className="text-sm text-blue-600 hover:underline"
@@ -130,6 +144,23 @@ export function ReverseParser() {
           ← Back to Parser Drill
         </a>
       </div>
+
+      {/* Modals */}
+      <Modal
+        isOpen={showMorphologyCharts}
+        onClose={() => setShowMorphologyCharts(false)}
+        title="Morphology Charts"
+      >
+        <MorphologyCharts />
+      </Modal>
+
+      <Modal
+        isOpen={showGrammarGuide}
+        onClose={() => setShowGrammarGuide(false)}
+        title="Grammar Guide"
+      >
+        <GrammarGuide />
+      </Modal>
 
       <VerseSelector
         selectedBook={selectedBook}

@@ -8,3 +8,4 @@
 .input{ @apply px-3 py-2 rounded border; }
 .select{ @apply px-2 py-1 rounded border bg-white; }
 .badge{ @apply inline-block px-2 py-0.5 text-xs rounded bg-slate-100; }
+.font-greek { font-family: 'Gentium Plus', 'Times New Roman', serif; font-size: 1.1em; }
