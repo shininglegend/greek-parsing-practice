@@ -20,15 +20,15 @@ export function MorphologyCharts() {
   const currentChart = MORPHOLOGY_CHARTS[activeChart as keyof typeof MORPHOLOGY_CHARTS];
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-3">
       {/* Sidebar navigation */}
-      <nav className="w-48 flex-shrink-0">
+      <nav className="w-32 flex-shrink-0">
         <ul className="space-y-1">
           {charts.map(chart => (
             <li key={chart.key}>
               <button
                 onClick={() => setActiveChart(chart.key)}
-                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                className={`w-full text-left px-2 py-2 rounded text-sm transition-colors ${
                   activeChart === chart.key
                     ? "bg-blue-100 text-blue-700 font-medium"
                     : "hover:bg-slate-100 text-slate-700"
@@ -70,7 +70,7 @@ export function MorphologyCharts() {
                         {row.map((cell, cIdx) => (
                           <td
                             key={cIdx}
-                            className={`border border-slate-300 px-4 py-2 ${
+                            className={`border border-slate-300 px-2 py-2 ${
                               cIdx === 0 ? "font-medium text-slate-700" : "text-slate-800 font-greek"
                             }`}
                           >

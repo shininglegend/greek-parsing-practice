@@ -18,9 +18,9 @@ export function GrammarGuide() {
   const currentSection = GRAMMAR_DEFINITIONS[activeSection as keyof typeof GRAMMAR_DEFINITIONS];
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-3">
       {/* Sidebar navigation */}
-      <nav className="w-48 flex-shrink-0">
+      <nav className="w-32 flex-shrink-0">
         <ul className="space-y-1">
           {sections.map(section => (
             <li key={section.key}>

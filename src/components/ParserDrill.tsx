@@ -3,10 +3,7 @@ import { loadVerse } from "../api";
 import { formatRef } from "../utils";
 import {
   Footer,
-  GrammarGuide,
-  Help,
-  Modal,
-  MorphologyCharts,
+  Header,
   Results,
   VerseSelector,
   WordCard,
@@ -28,9 +25,6 @@ export function ParserDrill() {
   const [selectedWordIds, setSelectedWordIds] = useState<Set<string>>(
     new Set()
   );
-  const [showGrammarGuide, setShowGrammarGuide] = useState(false);
-  const [showMorphologyCharts, setShowMorphologyCharts] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
 
   function load() {
@@ -76,59 +70,10 @@ export function ParserDrill() {
     verseData?.words.filter((w) => selectedWordIds.has(w.id)) ?? [];
 
   return (
-    <div className="mx-auto max-w-5xl p-4 space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-2xl font-bold">Koine Parser Drill</h1>
-        <button onClick={() => setShowHelp(true)} className="btn text-sm">
-          Help
-        </button>
-        <button
-          onClick={() => setShowMorphologyCharts(true)}
-          className="btn text-sm"
-        >
-          Morphology Charts
-        </button>
-        <button
-          onClick={() => setShowGrammarGuide(true)}
-          className="btn text-sm"
-        >
-          Grammar Guide
-        </button>
-        <a
-          href="#/reverse"
-          className="text-sm text-blue-600 hover:underline"
-          onClick={(e) => {
-            e.preventDefault();
-            window.history.pushState({}, "", "#/reverse");
-            window.dispatchEvent(new Event("locationchange"));
-          }}
-        >
-          Try Reverse Parser →
-        </a>
-      </div>
-
-      {/* Modals */}
-      <Modal isOpen={showHelp} onClose={() => setShowHelp(false)} title="Help">
-        <Help />
-      </Modal>
-
-      <Modal
-        isOpen={showMorphologyCharts}
-        onClose={() => setShowMorphologyCharts(false)}
-        title="Morphology Charts"
-      >
-        <MorphologyCharts />
-      </Modal>
-
-      <Modal
-        isOpen={showGrammarGuide}
-        onClose={() => setShowGrammarGuide(false)}
-        title="Grammar Guide"
-      >
-        <GrammarGuide />
-      </Modal>
-
-      <VerseSelector
+    <>
+      <Header currentMode="drill" />
+      <div className="mx-auto max-w-5xl p-4 space-y-4">
+        <VerseSelector
         selectedBook={selectedBook}
         chapter={chapter}
         verse={verse}
@@ -163,6 +108,7 @@ export function ParserDrill() {
           <Footer />
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
