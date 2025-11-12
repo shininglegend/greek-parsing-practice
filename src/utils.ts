@@ -146,11 +146,50 @@ export const RELEVANT_FIELDS: Record<string, FieldKey[]> = {
   particle: [],
 };
 
-export function isFieldRelevant(pos: string | undefined, field: FieldKey): boolean {
+export function isFieldRelevant(
+  pos: string | undefined, 
+  field: FieldKey,
+  parseFields?: ParseFields
+): boolean {
   if (!pos) return true; // Show all fields if no POS selected
   const normalized = normalizeMissing(pos);
   if (!normalized) return true;
+  
+  // Get base relevant fields for this POS
   const relevantFields = RELEVANT_FIELDS[normalized];
   if (!relevantFields) return true; // Unknown POS, show all
-  return relevantFields.includes(field);
+  
+  // Base check: is this field in the relevant list?
+  if (!relevantFields.includes(field)) return false;
+  
+  // Additional context-sensitive rules based on other parse fields
+  if (parseFields) {
+    const mood = normalizeMissing(parseFields.mood);
+    
+    // Verbs: participles and infinitives have special rules
+    if (normalized === "verb") {
+      // Infinitives: no person, no number (they're not inflected for these)
+      if (mood === "infinitive") {
+        if (field === "person" || field === "number") return false;
+      }
+      // Participles: no person (but they do have number/gender/case)
+      if (mood === "participle") {
+        if (field === "person") return false;
+        // Participles need nominal fields too
+        if (field === "case" || field === "gender") return true;
+      }
+    }
+    
+    // Particles: only POS is relevant (no inflection)
+    if (normalized === "particle") {
+      return false; // No fields beyond POS
+    }
+    
+    // Adverbs, prepositions, conjunctions: only POS
+    if (["adverb", "preposition", "conjunction"].includes(normalized)) {
+      return false;
+    }
+  }
+  
+  return true;
 }
