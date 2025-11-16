@@ -140,7 +140,6 @@ export const RELEVANT_FIELDS: Record<string, FieldKey[]> = {
   adjective: ["case", "number", "gender"],
   pronoun: ["case", "number", "gender", "person"],
   article: ["case", "number", "gender"],
-  participle: ["tense", "voice", "case", "number", "gender"],
   adverb: [],
   preposition: [],
   conjunction: [],
@@ -160,10 +159,8 @@ export function isFieldRelevant(
   const relevantFields = RELEVANT_FIELDS[normalized];
   if (!relevantFields) return true; // Unknown POS, show all
   
-  // Base check: is this field in the relevant list?
-  if (!relevantFields.includes(field)) return false;
-  
   // Additional context-sensitive rules based on other parse fields
+  // Check these BEFORE the base field check to handle special cases
   if (parseFields) {
     const mood = normalizeMissing(parseFields.mood);
     
@@ -176,7 +173,7 @@ export function isFieldRelevant(
       // Participles: no person (but they do have number/gender/case)
       if (mood === "participle") {
         if (field === "person") return false;
-        // Participles need nominal fields too
+        // Participles need nominal fields (case, number, gender) in addition to verbal fields
         if (field === "case" || field === "gender") return true;
       }
     }
@@ -191,6 +188,9 @@ export function isFieldRelevant(
       return false;
     }
   }
+  
+  // Base check: is this field in the relevant list?
+  if (!relevantFields.includes(field)) return false;
   
   return true;
 }
