@@ -17,6 +17,9 @@ interface VerseSelectorProps {
   selectedWordIds?: Set<string>;
   onWordToggle?: (wordId: string) => void;
   onNavigate?: (direction: 'prev' | 'next') => void;
+  lexiconLoaded?: boolean;
+  onLoadLexicon?: () => void;
+  loadingLexicon?: boolean;
 }
 
 export function VerseSelector({
@@ -34,7 +37,10 @@ export function VerseSelector({
   words,
   selectedWordIds,
   onWordToggle,
-  onNavigate
+  onNavigate,
+  lexiconLoaded,
+  onLoadLexicon,
+  loadingLexicon
 }: VerseSelectorProps) {
   const hasWords = words && words.length > 0;
   const showWordSelection = hasWords && onWordToggle && selectedWordIds;
@@ -94,6 +100,22 @@ export function VerseSelector({
           </>
         )}
       </div>
+      
+      {onLoadLexicon && hasWords && !lexiconLoaded && (
+        <button 
+          className="btn"
+          onClick={onLoadLexicon}
+          disabled={loadingLexicon || loading}
+        >
+          {loadingLexicon ? "Loading definitions..." : "Load Lexicon Definitions"}
+        </button>
+      )}
+      
+      {lexiconLoaded && (
+        <div className="text-sm text-green-700">
+          ✓ Lexicon loaded - hover over lemmas for brief definitions, click for full
+        </div>
+      )}
       
       {!hideVerse && showWordSelection && (
         <>

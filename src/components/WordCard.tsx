@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FIELD_SPECS, normalizeMissing, isFieldRelevant } from "../utils";
+import { Modal } from "./Modal";
 import type { DrillAnswer, ParseFields, Word } from "../types";
 
 interface WordCardProps {
@@ -11,6 +12,7 @@ interface WordCardProps {
 
 export function WordCard({ w, answer, onChange, disabled }: WordCardProps) {
   const [open, setOpen] = useState(false);
+  const [showFullDefinition, setShowFullDefinition] = useState(false);
   
   // Check if this word has any gold answers at all
   const hasAnyGoldAnswers = w.parse && FIELD_SPECS.some(f => 
@@ -37,7 +39,20 @@ export function WordCard({ w, answer, onChange, disabled }: WordCardProps) {
           {open ? "−" : "+"}
         </button>
         <div className="text-xl font-semibold">{w.surface}</div>
-        {w.lemma && <div className="badge">lemma: {w.lemma}</div>}
+        {w.lemma && (
+          <div 
+            className="badge cursor-pointer hover:bg-slate-200 transition-colors relative group"
+            onClick={() => setShowFullDefinition(true)}
+            title={w.definition?.brief || "lemma"}
+          >
+            lemma: {w.lemma}
+            {w.definition?.brief && (
+              <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-slate-800 text-white text-xs rounded px-2 py-1 whitespace-normal max-w-xs z-10 shadow-lg">
+                {w.definition.brief}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {open && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -126,6 +141,19 @@ export function WordCard({ w, answer, onChange, disabled }: WordCardProps) {
             );
           })}
         </div>
+      )}
+      
+      {/* Full definition modal */}
+      {w.definition?.full && (
+        <Modal 
+          isOpen={showFullDefinition} 
+          onClose={() => setShowFullDefinition(false)}
+          title={`${w.lemma} - Full Definition`}
+        >
+          <div className="text-sm leading-relaxed">
+            {w.definition.full}
+          </div>
+        </Modal>
       )}
     </div>
   );

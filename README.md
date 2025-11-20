@@ -59,3 +59,4 @@ npm run preview
 
 Currently uses the MorphGNT API (`https://api.morphgnt.org/v0`) for morphological data. The architecture supports swapping data sources through the adapter layer in `api.ts`
 
+Lexical data is from the [Dodson Greek Lexicon](https://github.com/biblicalhumanities/Dodson-Greek-Lexicon).

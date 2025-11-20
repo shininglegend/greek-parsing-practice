@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { loadVerse } from "../api";
 import { formatRef, scoreParse, celebrateWithConfetti } from "../utils";
+import { prefetchLemmas } from "../lexicon";
 import {
   Footer,
   Header,
@@ -25,22 +26,26 @@ export function ParserDrill() {
   const [selectedWordIds, setSelectedWordIds] = useState<Set<string>>(
     new Set()
   );
+  const [lexiconLoaded, setLexiconLoaded] = useState(false);
+  const [loadingLexicon, setLoadingLexicon] = useState(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
 
-  function load() {
+  async function load() {
     const formatted = formatRef(selectedBook, chapter, verse);
     setState({ kind: "loading", ref: formatted });
     setAnswers({});
-    loadVerse(formatted)
-      .then((v) => {
-        setState({ kind: "loaded", verse: v });
-        // Initially select all words
-        setSelectedWordIds(new Set(v.words.map((w) => w.id)));
-      })
-      .catch((e) => setState({ kind: "error", msg: e.message || "error" }));
+    setLexiconLoaded(false);
+    try {
+      const v = await loadVerse(formatted);
+      setState({ kind: "loaded", verse: v });
+      // Initially select all words
+      setSelectedWordIds(new Set(v.words.map((w) => w.id)));
+    } catch (e: any) {
+      setState({ kind: "error", msg: e.message || "error" });
+    }
   }
 
-  function handleNavigate(direction: 'prev' | 'next') {
+  async function handleNavigate(direction: 'prev' | 'next') {
     const currentVerse = parseInt(verse);
     if (isNaN(currentVerse)) return;
     
@@ -51,13 +56,15 @@ export function ParserDrill() {
     const formatted = formatRef(selectedBook, chapter, newVerse.toString());
     setState({ kind: "loading", ref: formatted });
     setAnswers({});
-    loadVerse(formatted)
-      .then((v) => {
-        setState({ kind: "loaded", verse: v });
-        // Initially select all words
-        setSelectedWordIds(new Set(v.words.map((w) => w.id)));
-      })
-      .catch((e) => setState({ kind: "error", msg: e.message || "error" }));
+    setLexiconLoaded(false);
+    try {
+      const v = await loadVerse(formatted);
+      setState({ kind: "loaded", verse: v });
+      // Initially select all words
+      setSelectedWordIds(new Set(v.words.map((w) => w.id)));
+    } catch (e: any) {
+      setState({ kind: "error", msg: e.message || "error" });
+    }
   }
 
   useEffect(() => {
@@ -83,6 +90,43 @@ export function ParserDrill() {
       }
       return next;
     });
+  }
+
+  async function loadLexiconForCurrentVerse() {
+    if (!verseData || lexiconLoaded || loadingLexicon) return;
+    
+    setLoadingLexicon(true);
+    try {
+      const lemmas = verseData.words.map(w => w.lemma).filter(Boolean) as string[];
+      const lexiconMap = await prefetchLemmas(lemmas);
+      
+      // Update verse data with definitions
+      const updatedVerse = {
+        ...verseData,
+        words: verseData.words.map(w => {
+          if (w.lemma) {
+            const entry = lexiconMap.get(w.lemma);
+            if (entry) {
+              return {
+                ...w,
+                definition: {
+                  brief: entry.definitions.find(d => d.role === "brief")?.text,
+                  full: entry.definitions.find(d => d.role === "full")?.text,
+                }
+              };
+            }
+          }
+          return w;
+        })
+      };
+      
+      setState({ kind: "loaded", verse: updatedVerse });
+      setLexiconLoaded(true);
+    } catch (e: any) {
+      console.error("Failed to load lexicon:", e);
+    } finally {
+      setLoadingLexicon(false);
+    }
   }
 
   // Filter words to only show selected ones
@@ -143,6 +187,9 @@ export function ParserDrill() {
         selectedWordIds={selectedWordIds}
         onWordToggle={toggleWord}
         onNavigate={handleNavigate}
+        lexiconLoaded={lexiconLoaded}
+        onLoadLexicon={loadLexiconForCurrentVerse}
+        loadingLexicon={loadingLexicon}
       />
 
       {verseData && wordsToShow.length > 0 && (

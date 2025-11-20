@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { loadVerse } from "../api";
 import { formatRef, FIELD_SPECS, celebrateWithConfetti } from "../utils";
+import { prefetchLemmas } from "../lexicon";
 import {
   Footer,
   Header,
@@ -24,19 +25,25 @@ export function ReverseParser() {
   const [ignoreAccents, setIgnoreAccents] = useState(false);
   const [ignoreBreathing, setIgnoreBreathing] = useState(false);
   const [ignoreCase, setIgnoreCase] = useState(false);
+  const [lexiconLoaded, setLexiconLoaded] = useState(false);
+  const [loadingLexicon, setLoadingLexicon] = useState(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
 
-  function load() {
+  async function load() {
     const formatted = formatRef(selectedBook, chapter, verse);
     setState({ kind: "loading", ref: formatted });
     setUserInputs({});
     setRevealed(false);
-    loadVerse(formatted)
-      .then((v) => setState({ kind: "loaded", verse: v }))
-      .catch((e) => setState({ kind: "error", msg: e.message || "error" }));
+    setLexiconLoaded(false);
+    try {
+      const v = await loadVerse(formatted);
+      setState({ kind: "loaded", verse: v });
+    } catch (e: any) {
+      setState({ kind: "error", msg: e.message || "error" });
+    }
   }
 
-  function handleNavigate(direction: 'prev' | 'next') {
+  async function handleNavigate(direction: 'prev' | 'next') {
     const currentVerse = parseInt(verse);
     if (isNaN(currentVerse)) return;
     
@@ -48,9 +55,50 @@ export function ReverseParser() {
     setState({ kind: "loading", ref: formatted });
     setUserInputs({});
     setRevealed(false);
-    loadVerse(formatted)
-      .then((v) => setState({ kind: "loaded", verse: v }))
-      .catch((e) => setState({ kind: "error", msg: e.message || "error" }));
+    setLexiconLoaded(false);
+    try {
+      const v = await loadVerse(formatted);
+      setState({ kind: "loaded", verse: v });
+    } catch (e: any) {
+      setState({ kind: "error", msg: e.message || "error" });
+    }
+  }
+
+  async function loadLexiconForCurrentVerse() {
+    if (!verseData || lexiconLoaded || loadingLexicon) return;
+    
+    setLoadingLexicon(true);
+    try {
+      const lemmas = verseData.words.map(w => w.lemma).filter(Boolean) as string[];
+      const lexiconMap = await prefetchLemmas(lemmas);
+      
+      // Update verse data with definitions
+      const updatedVerse = {
+        ...verseData,
+        words: verseData.words.map(w => {
+          if (w.lemma) {
+            const entry = lexiconMap.get(w.lemma);
+            if (entry) {
+              return {
+                ...w,
+                definition: {
+                  brief: entry.definitions.find(d => d.role === "brief")?.text,
+                  full: entry.definitions.find(d => d.role === "full")?.text,
+                }
+              };
+            }
+          }
+          return w;
+        })
+      };
+      
+      setState({ kind: "loaded", verse: updatedVerse });
+      setLexiconLoaded(true);
+    } catch (e: any) {
+      console.error("Failed to load lexicon:", e);
+    } finally {
+      setLoadingLexicon(false);
+    }
   }
 
   useEffect(() => {
@@ -172,6 +220,9 @@ export function ReverseParser() {
         error={state.kind === "error" ? state.msg : undefined}
         hideVerse={true}
         onNavigate={handleNavigate}
+        lexiconLoaded={lexiconLoaded}
+        onLoadLexicon={loadLexiconForCurrentVerse}
+        loadingLexicon={loadingLexicon}
       />
 
       {/* Toggles for ignoring diacritics */}

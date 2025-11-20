@@ -14,6 +14,10 @@ export type Word = {
   lemma?: string;      // e.g., "ἐν"
   parse?: ParseFields; // normalized fields
   id: string;          // stable key
+  definition?: {       // optional lexicon data
+    brief?: string;
+    full?: string;
+  };
 };
 
 export type Verse = {
