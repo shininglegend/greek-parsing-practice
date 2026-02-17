@@ -41,13 +41,10 @@ const POS_MAP: Record<string, string> = {
   'N': 'noun',
   'V': 'verb',
   'RA': 'article',
-  'RC': 'pronoun',
   'RD': 'pronoun',
   'RI': 'pronoun',
   'RP': 'pronoun',
-  'RQ': 'pronoun',
   'RR': 'pronoun',
-  'RX': 'pronoun',
   'P': 'preposition',
   'C': 'conjunction',
   'D': 'adverb',
@@ -166,8 +163,8 @@ export async function loadVerse(ref: string): Promise<Verse> {
         "@id": "/v0/verse/test0101.json",
         "title": "Test 1.1",
         "words": [
-          { text: "τι", lemma: "τίς", pos: "RQ", case: "A", number: "S", gender: "N" },
-          { text: "τινας", lemma: "τις", pos: "RQ", case: "A", number: "P", gender: "M" },
+          { text: "τι", lemma: "τις", pos: "RI", case: "A", number: "S", gender: "N" },
+          { text: "τινας", lemma: "τις", pos: "RI", case: "A", number: "P", gender: "M" },
           { text: "ποιου", lemma: "ποῖος", pos: "RI", case: "G", number: "S", gender: "M" }
         ]
       };
