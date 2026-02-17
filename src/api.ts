@@ -160,6 +160,19 @@ export async function loadVerse(ref: string): Promise<Verse> {
       };
       return mapVerse(fallback);
     }
+    // fallback: Test verse for demonstrating pronoun code fixes (τις, τι, τινας, ποιου)
+    if (/^test\s*1[:.]1$/i.test(ref)) {
+      const fallback: MorphVerse = {
+        "@id": "/v0/verse/test0101.json",
+        "title": "Test 1.1",
+        "words": [
+          { text: "τι", lemma: "τίς", pos: "RQ", case: "A", number: "S", gender: "N" },
+          { text: "τινας", lemma: "τις", pos: "RQ", case: "A", number: "P", gender: "M" },
+          { text: "ποιου", lemma: "ποῖος", pos: "RI", case: "G", number: "S", gender: "M" }
+        ]
+      };
+      return mapVerse(fallback);
+    }
     throw new Error("Lookup failed");
   }
 }
