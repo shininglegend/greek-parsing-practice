@@ -19,7 +19,7 @@
 	"vars": {
 		"AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
 		"AI_GATEWAY_ID": "greekparser",
-		"ADMIN_EMAILS": "jvctext@gmail.com",
+		"ADMIN_EMAILS": ["jvctext@gmail.com"],
 		"EMAIL_FROM": "accounts@greek.titusmurphy.com",
 		"TURNSTILE_SITE_KEY": ""
 	},
@@ -42,7 +42,8 @@
 	},
 	"send_email": [
 		{
-			"name": "EMAIL"
+			"name": "EMAIL",
+			"remote": true
 		}
 	]
 }

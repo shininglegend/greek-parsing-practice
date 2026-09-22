@@ -343,3 +343,12 @@ export function explainCorrect(input: {
     evidence: evidence.length > 0 ? evidence : ["The form and the clause around it are the signal."],
   };
 }
+
+/** While a form is still incomplete, explain only the latest correct field.
+ *  Once every visible field is right, explain each one. */
+export function fieldsToExplain<T>(visible: T[], correct: (field: T) => boolean): T[] {
+  const done = visible.filter(correct);
+  if (done.length === 0) return [];
+  if (done.length === visible.length) return done;
+  return done.slice(-1);
+}

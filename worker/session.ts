@@ -26,12 +26,26 @@ export function publicUser(user: UserRow) {
   };
 }
 
+export function parseAdminEmails(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap((entry) => parseAdminEmails(entry));
+  if (typeof value !== "string") return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith("[")) {
+    try {
+      return parseAdminEmails(JSON.parse(trimmed) as unknown);
+    } catch {
+      // A comma-separated list, not a JSON array.
+    }
+  }
+  return trimmed
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase().replace(/^["']|["']$/g, ""))
+    .filter(Boolean);
+}
+
 export function isAdminEmail(env: Env, email: string): boolean {
-  const allowlist: string = env.ADMIN_EMAILS;
-  return allowlist.split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(email.trim().toLowerCase());
+  return parseAdminEmails(env.ADMIN_EMAILS).includes(email.trim().toLowerCase());
 }
 
 export function monthStartIso(): string {
@@ -77,11 +91,19 @@ export async function ensureSession(request: Request, env: Env): Promise<Session
     )
       .bind(existing, new Date().toISOString())
       .first<UserRow>();
-    if (user) return { user, cookies: [] };
+    if (user) return { user: await promoteAdmin(env, user), cookies: [] };
   }
   const user = await createGuest(env);
   const cookie = await insertSession(env, user.id, request);
   return { user, cookies: [cookie] };
+}
+
+async function promoteAdmin(env: Env, user: UserRow): Promise<UserRow> {
+  if (!user.email || user.role === "admin" || !isAdminEmail(env, user.email)) return user;
+  await env.DB.prepare("UPDATE users SET role = 'admin', status = 'approved' WHERE id = ?")
+    .bind(user.id)
+    .run();
+  return { ...user, role: "admin", status: "approved" };
 }
 
 export async function logout(request: Request, env: Env): Promise<string> {

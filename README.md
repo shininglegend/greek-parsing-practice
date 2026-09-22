@@ -95,7 +95,7 @@ Put the printed id on the existing `CACHE` binding. Keep the binding name `CACHE
 
 In `wrangler.jsonc` under `vars`:
 
-- `ADMIN_EMAILS` is a comma-separated list. The first time one of those addresses opens a magic link, that account is created as `admin` and `approved`. Any other address is `pending` until you approve it at `/admin`.
+- `ADMIN_EMAILS` is the allowlist. A comma-separated string or a list of addresses both work. The first time one of those addresses opens a magic link, that account is created as `admin` and `approved`. Any other address is `pending` until you approve it at `/admin`. An address already signed in is promoted on the next request.
 - `EMAIL_FROM` is the From address, and its domain has to be onboarded for Email Sending:
 
 ```bash
@@ -103,6 +103,8 @@ npx wrangler email sending enable example.com
 ```
 
 Then set `EMAIL_FROM` to something like `greek@example.com`. While it is empty, sign-in returns 503 and the rest of the app still works.
+
+`npm run dev` sends that mail for real, because the `EMAIL` binding has `"remote": true`. Without that flag, Wrangler only prints the link in the terminal. The link points at `localhost`, so open it on this machine.
 
 ### 4. Tutor
 

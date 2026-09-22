@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { loadVerse } from "../api";
 import { prefetchLemmas, type LexiconEntry } from "../lexicon";
 import { useSession } from "../session";
-import { explainCorrect, explainMiss, findCue, foldGreek, type SignalExplanation } from "../signals";
+import { explainCorrect, explainMiss, fieldsToExplain, findCue, foldGreek, type SignalExplanation } from "../signals";
 import { ApiError, askTutor, recordAttempt } from "../studyApi";
 import type { DrillAnswer, ParseFields, Verse, Word } from "../types";
 import {
@@ -170,24 +170,27 @@ export function VerseSession() {
     return null;
   }, [active, answers, miss, verseData]);
 
-  const correctNote = useMemo(() => {
-    if (!active || !verseData || !whyOpen) return null;
-    const fields = visibleFields(active, answers[active.id]).filter((field) => {
+  const correctNotes = useMemo(() => {
+    if (!active || !verseData || !whyOpen) return [];
+    const visible = visibleFields(active, answers[active.id]);
+    const explained = fieldsToExplain(visible, (field) => {
       const guess = normalizeMissing(answers[active.id]?.[field.key]);
       const gold = normalizeMissing(active.parse?.[field.key]);
-      return guess && gold && guess === gold;
+      return Boolean(guess && gold && guess === gold);
     });
-    const field = fields[fields.length - 1];
-    if (!field) return null;
-    const gold = normalizeMissing(active.parse?.[field.key]);
-    if (!gold) return null;
-    return explainCorrect({
-      surface: active.surface,
-      lemma: active.lemma,
-      field: field.key,
-      gold,
-      parse: active.parse,
-      verseWords: verseData.words,
+    return explained.flatMap((field) => {
+      const gold = normalizeMissing(active.parse?.[field.key]);
+      if (!gold) return [];
+      return [
+        explainCorrect({
+          surface: active.surface,
+          lemma: active.lemma,
+          field: field.key,
+          gold,
+          parse: active.parse,
+          verseWords: verseData.words,
+        }),
+      ];
     });
   }, [active, answers, verseData, whyOpen]);
 
@@ -253,6 +256,11 @@ export function VerseSession() {
     { correct: 0, total: 0 }
   );
 
+  function showWord(index: number) {
+    setMiss(null);
+    setActiveId(wordsToShow[index]?.id ?? null);
+  }
+
   return (
     <>
       <Header />
@@ -310,13 +318,13 @@ export function VerseSession() {
               })}
             </div>
 
-            <div className="card space-y-3">
+            <div className="card w-fit max-w-full space-y-2 p-3">
               <div className="flex items-baseline justify-between gap-3">
                 <div className="font-greek text-3xl">{active.surface}</div>
                 {active.lemma && (
                   <button
                     type="button"
-                    className="badge min-h-11"
+                    className="badge"
                     onClick={() => setDefinitionWord(active)}
                   >
                     {active.lemma}
@@ -331,14 +339,14 @@ export function VerseSession() {
                 return (
                   <fieldset key={field.key}>
                     <legend className="text-xs text-slate-600 mb-1">{field.label}</legend>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {field.options.filter((option) => option !== "—").map((option) => (
                         <button
                           key={option}
                           type="button"
                           aria-pressed={value === option}
                           onClick={() => choose(active, field.key, option)}
-                          className={`min-h-11 px-3 py-2 rounded-lg border text-sm ${
+                          className={`min-h-9 px-2.5 py-1 rounded-md border text-sm ${
                             value === option && status === "correct"
                               ? "bg-green-100 border-green-600"
                               : value === option && status === "incorrect"
@@ -355,21 +363,38 @@ export function VerseSession() {
                   </fieldset>
                 );
               })}
-              <button
-                type="button"
-                className="text-sm text-slate-600 underline min-h-11"
-                onClick={() => {
-                  setSelectedWordIds((prev) => {
-                    const next = new Set(prev);
-                    next.delete(active.id);
-                    return next;
-                  });
-                  const remaining = wordsToShow.filter((word) => word.id !== active.id);
-                  setActiveId(remaining[0]?.id ?? null);
-                }}
-              >
-                Skip this word
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="text-sm text-slate-600 underline py-1"
+                  onClick={() => {
+                    setSelectedWordIds((prev) => {
+                      const next = new Set(prev);
+                      next.delete(active.id);
+                      return next;
+                    });
+                    const remaining = wordsToShow.filter((word) => word.id !== active.id);
+                    setActiveId(remaining[0]?.id ?? null);
+                  }}
+                >
+                  Skip this word
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={activeIndex <= 0}
+                    onClick={() => showWord(activeIndex - 1)}
+                  >
+                    Previous
+                  </button>
+                  {activeIndex < wordsToShow.length - 1 && (
+                    <button type="button" className="btn" onClick={() => showWord(activeIndex + 1)}>
+                      Next
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {note && (
@@ -405,7 +430,12 @@ export function VerseSession() {
                 {whyOpen ? "Hide why" : "Why this form"}
               </button>
             )}
-            {correctNote && <SignalCard note={correctNote} />}
+            {correctNotes.length > 1 && (
+              <p className="text-sm font-medium text-slate-800">The whole parse</p>
+            )}
+            {correctNotes.map((item) => (
+              <SignalCard key={item.title} note={item} />
+            ))}
           </>
         )}
 
@@ -427,39 +457,14 @@ export function VerseSession() {
                 Back to parsing
               </button>
             ) : (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={activeIndex <= 0}
-                  onClick={() => {
-                    setMiss(null);
-                    setActiveId(wordsToShow[activeIndex - 1]?.id ?? null);
-                  }}
-                >
-                  Previous
-                </button>
-                {activeIndex < wordsToShow.length - 1 && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => {
-                      setMiss(null);
-                      setActiveId(wordsToShow[activeIndex + 1]?.id ?? null);
-                    }}
-                  >
-                    Next
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={!allFilled}
-                  onClick={() => setPhase("translate")}
-                >
-                  {allFilled ? "Translate" : "Finish the words"}
-                </button>
-              </div>
+              <button
+                type="button"
+                className="btn"
+                disabled={!allFilled}
+                onClick={() => setPhase("translate")}
+              >
+                {allFilled ? "Translate" : "Finish the words"}
+              </button>
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildChecklist } from "./checklist";
-import { explainMiss, findCue, foldGreek } from "./signals";
+import { explainMiss, fieldsToExplain, findCue, foldGreek } from "./signals";
 import type { Word } from "./types";
 
 describe("foldGreek", () => {
@@ -82,5 +82,17 @@ describe("buildChecklist", () => {
     const lines = buildChecklist(words).map((line) => line.text);
     expect(lines.some((line) => line.includes("θεοῦ, genitive") && line.includes("of"))).toBe(true);
     expect(lines.some((line) => line.includes("λέγωμεν, subjunctive") && line.includes("so that"))).toBe(true);
+  });
+});
+
+describe("fieldsToExplain", () => {
+  const fields = ["pos", "tense", "mood"];
+
+  it("explains only the latest correct field until the form is complete", () => {
+    expect(fieldsToExplain(fields, (field) => field !== "mood")).toEqual(["tense"]);
+  });
+
+  it("explains every field once the form is complete", () => {
+    expect(fieldsToExplain(fields, () => true)).toEqual(fields);
   });
 });
