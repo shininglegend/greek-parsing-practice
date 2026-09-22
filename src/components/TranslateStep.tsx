@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { articlePairs, verseSegments } from "../articlePairs";
 import { buildChecklist } from "../checklist";
 import { useSession } from "../session";
 import { ApiError, askTutor, getTranslations, type EnglishVersions } from "../studyApi";
@@ -64,13 +65,23 @@ export function TranslateStep({ verse, words }: { verse: Verse; words: Word[] })
     <div className="space-y-4">
       <div className="card space-y-3">
         <div className="font-semibold">Write what it says</div>
-        <div className="flex flex-wrap gap-x-3 gap-y-2">
-          {words.map((word) => (
-            <div key={word.id} className="min-w-16">
-              <div className="font-greek text-xl">{word.surface}</div>
-              <div className="text-xs text-slate-600">{word.definition?.brief ?? "—"}</div>
-            </div>
-          ))}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-3">
+          {verseSegments(words, articlePairs(words)).map((segment) => {
+            const glosses = (segment.kind === "pair" ? segment.words : [segment.word]).map((word) => (
+              <div key={word.id} className="min-w-16">
+                <div className="font-greek text-xl">{word.surface}</div>
+                <div className="text-xs text-slate-600">{word.definition?.brief ?? "—"}</div>
+              </div>
+            ));
+            if (segment.kind === "pair") {
+              return (
+                <div key={segment.pair.articleId} className="relative flex gap-x-3 after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-0.5 after:-translate-y-1 after:rounded-full after:bg-sky-400">
+                  {glosses}
+                </div>
+              );
+            }
+            return glosses;
+          })}
         </div>
         <textarea
           className="input w-full min-h-28"

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { loadVerse } from "../api";
 import { prefetchLemmas, type LexiconEntry } from "../lexicon";
 import { useSession } from "../session";
+import { agreementFill, articlePairs, explainAgreement, headNominalKnown, nominalFeatures, plainSurface, verseSegments } from "../articlePairs";
 import { explainCorrect, explainMiss, fieldsToExplain, findCue, foldGreek, type SignalExplanation } from "../signals";
 import { ApiError, askTutor, recordAttempt } from "../studyApi";
 import type { DrillAnswer, ParseFields, Verse, Word } from "../types";
@@ -37,13 +38,14 @@ function initialRef(search: string) {
   return { book, chapter: match[2], verse: match[3] };
 }
 
-function visibleFields(word: Word, answer: DrillAnswer | undefined) {
+function visibleFields(word: Word, answer: DrillAnswer | undefined, pairedArticle: boolean) {
   const goldPos = normalizeMissing(word.parse?.pos);
   const selectedPos = normalizeMissing(answer?.pos);
   const posCorrect = Boolean(selectedPos && goldPos && selectedPos === goldPos);
   return FIELD_SPECS.filter((spec) => {
     if (!normalizeMissing(word.parse?.[spec.key])) return false;
     if (spec.key === "pos") return true;
+    if (pairedArticle) return false;
     if (!posCorrect) return false;
     return isFieldRelevant(selectedPos, spec.key, answer ?? {});
   });
@@ -53,6 +55,32 @@ function signalText(note: SignalExplanation) {
   return [note.title, note.contrast, ...note.evidence, note.english, note.grammar?.definition]
     .filter(Boolean)
     .join("\n");
+}
+
+function WordButton({
+  word,
+  active,
+  selected,
+  marked,
+  onSelect,
+}: {
+  word: Word;
+  active: boolean;
+  selected: boolean;
+  marked: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`min-h-11 px-1 rounded-md ${
+        active ? "bg-slate-900 text-white" : selected ? "text-slate-900" : "text-slate-400"
+      } ${marked ? "underline decoration-amber-500 decoration-2" : ""}`}
+    >
+      {word.surface}
+    </button>
+  );
 }
 
 export function VerseSession() {
@@ -76,6 +104,7 @@ export function VerseSession() {
   const [token, setToken] = useState("");
   const confettiTriggered = useRef(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
+  const pairs = useMemo(() => articlePairs(verseData?.words ?? []), [verseData]);
 
   async function loadRef(book: string, chap: string, verse: string) {
     const formatted = formatRef(book, chap, verse);
@@ -132,7 +161,7 @@ export function VerseSession() {
     const goldPos = normalizeMissing(word.parse?.pos);
     const selectedPos = normalizeMissing(answers[word.id]?.pos);
     if (goldPos && selectedPos !== goldPos) return false;
-    const fields = visibleFields(word, answers[word.id]);
+    const fields = visibleFields(word, answers[word.id], pairs.some((pair) => pair.articleId === word.id));
     if (fields.length === 0) return !word.parse;
     return fields.every((field) => normalizeMissing(answers[word.id]?.[field.key]));
   });
@@ -172,7 +201,14 @@ export function VerseSession() {
 
   const correctNotes = useMemo(() => {
     if (!active || !verseData || !whyOpen) return [];
-    const visible = visibleFields(active, answers[active.id]);
+    const pair = pairs.find((item) => item.articleId === active.id);
+    const head = pair ? verseData.words.find((word) => word.id === pair.headId) : undefined;
+    const posGuess = normalizeMissing(answers[active.id]?.pos);
+    const posGold = normalizeMissing(active.parse?.pos);
+    if (pair && head && posGuess === "article" && posGold === "article") {
+      return [explainAgreement(active, head, headNominalKnown(head, answers[head.id]))];
+    }
+    const visible = visibleFields(active, answers[active.id], Boolean(pair));
     const explained = fieldsToExplain(visible, (field) => {
       const guess = normalizeMissing(answers[active.id]?.[field.key]);
       const gold = normalizeMissing(active.parse?.[field.key]);
@@ -192,15 +228,22 @@ export function VerseSession() {
         }),
       ];
     });
-  }, [active, answers, verseData, whyOpen]);
+  }, [active, answers, verseData, whyOpen, pairs]);
 
   async function choose(word: Word, field: keyof ParseFields, value: string) {
     if (answers[word.id]?.[field] === value) return;
-    setAnswers((prev) => ({ ...prev, [word.id]: { ...prev[word.id], [field]: value } }));
-    setWhyOpen(false);
-    setTutorReply(null);
     const gold = normalizeMissing(word.parse?.[field]);
     const guess = normalizeMissing(value);
+    const fill =
+      field === "pos" && guess === gold && gold === "article" && verseData
+        ? agreementFill(word, verseData.words)
+        : undefined;
+    setAnswers((prev) => ({
+      ...prev,
+      [word.id]: { ...prev[word.id], [field]: value, ...fill },
+    }));
+    setWhyOpen(false);
+    setTutorReply(null);
     if (!gold || !guess || !verseData || !user) {
       if (gold && guess && guess !== gold) setMiss({ field, priorMisses: 0 });
       else setMiss(null);
@@ -261,6 +304,23 @@ export function VerseSession() {
     setActiveId(wordsToShow[index]?.id ?? null);
   }
 
+  function selectWord(wordId: string) {
+    setActiveId(wordId);
+    setSelectedWordIds((prev) => new Set(prev).add(wordId));
+    setMiss(null);
+    setPhase("parse");
+  }
+
+  const activePair = active ? pairs.find((pair) => pair.articleId === active.id) : undefined;
+  const activeHead = activePair ? verseData?.words.find((word) => word.id === activePair.headId) : undefined;
+  const articleAgreed = Boolean(
+    active &&
+      activeHead &&
+      normalizeMissing(answers[active.id]?.pos) === "article" &&
+      normalizeMissing(active.parse?.pos) === "article"
+  );
+  const showAgreementFeatures = Boolean(activeHead && headNominalKnown(activeHead, answers[activeHead.id]));
+
   return (
     <>
       <Header />
@@ -289,31 +349,40 @@ export function VerseSession() {
 
         {verseData && wordsToShow.length > 0 && phase === "parse" && active && (
           <>
-            <div className="font-greek text-2xl leading-relaxed flex flex-wrap gap-x-2 gap-y-2">
-              {verseData.words.map((word) => {
-                const selected = selectedWordIds.has(word.id);
-                const isActive = word.id === active.id;
-                const marked = cueDisplay && foldGreek(word.surface) === foldGreek(cueDisplay) && note;
+            <div className="font-greek text-2xl leading-relaxed flex flex-wrap items-baseline gap-x-3 gap-y-3">
+              {verseSegments(verseData.words, pairs).map((segment) => {
+                if (segment.kind === "pair") {
+                  const head = verseData.words.find((word) => word.id === segment.pair.headId);
+                  return (
+                    <span
+                      key={segment.pair.articleId}
+                      title={head ? `Agrees with ${plainSurface(head.surface)}` : undefined}
+                      className="relative inline-flex items-baseline gap-x-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-0.5 after:-translate-y-1 after:rounded-full after:bg-sky-400"
+                    >
+                      {segment.words.map((word) => (
+                        <WordButton
+                          key={word.id}
+                          word={word}
+                          active={word.id === active.id}
+                          selected={selectedWordIds.has(word.id)}
+                          marked={Boolean(cueDisplay && foldGreek(word.surface) === foldGreek(cueDisplay) && note)}
+                          onSelect={() => selectWord(word.id)}
+                        />
+                      ))}
+                    </span>
+                  );
+                }
                 return (
-                  <button
-                    key={word.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveId(word.id);
-                      setSelectedWordIds((prev) => new Set(prev).add(word.id));
-                      setMiss(null);
-                      setPhase("parse");
-                    }}
-                    className={`min-h-11 px-1 rounded-md ${
-                      isActive
-                        ? "bg-slate-900 text-white"
-                        : selected
-                          ? "text-slate-900"
-                          : "text-slate-400"
-                    } ${marked ? "underline decoration-amber-500 decoration-2" : ""}`}
-                  >
-                    {word.surface}
-                  </button>
+                  <WordButton
+                    key={segment.word.id}
+                    word={segment.word}
+                    active={segment.word.id === active.id}
+                    selected={selectedWordIds.has(segment.word.id)}
+                    marked={Boolean(
+                      cueDisplay && foldGreek(segment.word.surface) === foldGreek(cueDisplay) && note
+                    )}
+                    onSelect={() => selectWord(segment.word.id)}
+                  />
                 );
               })}
             </div>
@@ -331,7 +400,7 @@ export function VerseSession() {
                   </button>
                 )}
               </div>
-              {visibleFields(active, answers[active.id]).map((field) => {
+              {visibleFields(active, answers[active.id], pairs.some((pair) => pair.articleId === active.id)).map((field) => {
                 const value = answers[active.id]?.[field.key] ?? "";
                 const gold = normalizeMissing(active.parse?.[field.key]);
                 const guess = normalizeMissing(value);
@@ -363,6 +432,12 @@ export function VerseSession() {
                   </fieldset>
                 );
               })}
+              {articleAgreed && activeHead && (
+                <p className="text-sm text-slate-700">
+                  Agrees with <span className="font-greek">{plainSurface(activeHead.surface)}</span>
+                  {showAgreementFeatures ? `: ${nominalFeatures(active)}.` : ". Parse that word, and this article matches it."}
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
