@@ -38,6 +38,30 @@ function initialRef(search: string) {
   return { book, chapter: match[2], verse: match[3] };
 }
 
+const PARSE_KEYS: (keyof ParseFields)[] = [
+  "pos",
+  "case",
+  "number",
+  "gender",
+  "tense",
+  "voice",
+  "mood",
+  "person",
+];
+
+// Surface + gold parse fields so the tutor can cite agreement partners.
+function formatVerseParses(words: Word[]): string {
+  return words
+    .map((word) => {
+      const parts = PARSE_KEYS.flatMap((key) => {
+        const value = word.parse?.[key];
+        return value ? [`${key}: ${value}`] : [];
+      });
+      return parts.length > 0 ? `${word.surface} (${parts.join("; ")})` : word.surface;
+    })
+    .join(" ");
+}
+
 function visibleFields(word: Word, answer: DrillAnswer | undefined, pairedArticle: boolean) {
   const goldPos = normalizeMissing(word.parse?.pos);
   const selectedPos = normalizeMissing(answer?.pos);
@@ -103,6 +127,9 @@ export function VerseSession() {
   const [tutorLoading, setTutorLoading] = useState(false);
   const [token, setToken] = useState("");
   const confettiTriggered = useRef(false);
+  // Auto-jump to translate on first full parse; suppressed after "Back to parsing"
+  // until the verse is incomplete again (or a new verse loads).
+  const autoJumpToTranslate = useRef(true);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
   const pairs = useMemo(() => articlePairs(verseData?.words ?? []), [verseData]);
 
@@ -115,6 +142,7 @@ export function VerseSession() {
     setWhyOpen(false);
     setTutorReply(null);
     confettiTriggered.current = false;
+    autoJumpToTranslate.current = true;
     try {
       const loaded = await loadVerse(formatted);
       const lemmas = loaded.words.map((word) => word.lemma).filter(Boolean) as string[];
@@ -177,6 +205,17 @@ export function VerseSession() {
       confettiTriggered.current = true;
     }
   }, [allCorrect]);
+
+  useEffect(() => {
+    if (!allFilled) {
+      autoJumpToTranslate.current = true;
+      return;
+    }
+    if (phase === "parse" && autoJumpToTranslate.current) {
+      autoJumpToTranslate.current = false;
+      setPhase("translate");
+    }
+  }, [allFilled, phase]);
 
   const cueDisplay = active ? findCue(verseData?.words ?? [], active.parse)?.display : undefined;
 
@@ -297,7 +336,7 @@ export function VerseSession() {
         gold: extra.gold,
         guess: extra.guess,
         whole: extra.whole ?? false,
-        clause: verseData.words.map((word) => word.surface).join(" "),
+        verseParses: formatVerseParses(verseData.words),
         signal: cards.map(signalText).join("\n\n"),
         turnstileToken: token,
       });
@@ -488,42 +527,48 @@ export function VerseSession() {
                     </button>
                   )}
                 </div>
+                {!note && (
+                  <button
+                    type="button"
+                    className="ml-auto text-sm underline"
+                    onClick={() => setWhyOpen((open) => !open)}
+                  >
+                    {whyOpen ? "Hide why" : "Why this form"}
+                  </button>
+                )}
               </div>
             </div>
 
             {note && (
-              <SignalCard note={note} priorMisses={miss?.priorMisses}>
-                {approved ? (
-                  <>
-                    <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
+              <SignalCard
+                note={note}
+                priorMisses={miss?.priorMisses}
+                action={
+                  approved ? (
                     <button
                       type="button"
-                      className="btn"
+                      className="btn w-fit"
                       disabled={tutorLoading || (Boolean(turnstileSiteKey) && !token)}
                       onClick={explainFurther}
                     >
                       {tutorLoading ? "Asking…" : "Explain further"}
                     </button>
-                  </>
-                ) : (
-                  <button type="button" className="btn opacity-60" disabled>
-                    {user?.status === "pending"
-                      ? "Waiting for approval"
-                      : user?.status === "denied"
-                        ? "Tutor notes are off for this account"
-                        : "Sign in to ask the tutor"}
-                  </button>
-                )}
+                  ) : (
+                    <button type="button" className="btn w-fit opacity-60" disabled>
+                      {user?.status === "pending"
+                        ? "Waiting for approval"
+                        : user?.status === "denied"
+                          ? "Tutor notes are off for this account"
+                          : "Sign in to ask the tutor"}
+                    </button>
+                  )
+                }
+              >
                 {tutorError && <p className="text-sm text-red-700">{tutorError}</p>}
                 {tutorReply && <p className="whitespace-pre-wrap">{tutorReply}</p>}
               </SignalCard>
             )}
 
-            {!note && (
-              <button type="button" className="text-sm underline min-h-11" onClick={() => setWhyOpen((open) => !open)}>
-                {whyOpen ? "Hide why" : "Why this form"}
-              </button>
-            )}
             {correctNotes.length > 1 && (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -547,7 +592,6 @@ export function VerseSession() {
                     </button>
                   )}
                 </div>
-                {approved && <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />}
               </div>
             )}
             {(tutorError || tutorReply) && correctNotes.length > 1 && (
@@ -570,6 +614,13 @@ export function VerseSession() {
           <TranslateStep verse={verseData} words={wordsToShow} />
         )}
 
+        {/* One Turnstile for miss explain and/or whole-parse explain */}
+        {verseData &&
+          phase === "parse" &&
+          approved &&
+          (Boolean(note) || correctNotes.length > 1) && (
+            <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
+          )}
         {verseData && <Footer />}
       </div>
 
@@ -580,18 +631,36 @@ export function VerseSession() {
               {score.total > 0 ? `${score.correct}/${score.total}` : "Parse"}
             </div>
             {phase === "translate" ? (
-              <button type="button" className="btn" onClick={() => setPhase("parse")}>
-                Back to parsing
-              </button>
-            ) : (
               <button
                 type="button"
                 className="btn"
-                disabled={!allFilled}
-                onClick={() => setPhase("translate")}
+                onClick={() => {
+                  autoJumpToTranslate.current = false;
+                  setPhase("parse");
+                }}
               >
-                {allFilled ? "Translate" : "Finish the words"}
+                Back to parsing
               </button>
+            ) : allFilled ? (
+              <button type="button" className="btn" onClick={() => setPhase("translate")}>
+                Translate
+              </button>
+            ) : (
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <p className="text-sm text-slate-600 text-right">
+                  Completely parse this verse to get to the translate step
+                </p>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    autoJumpToTranslate.current = false;
+                    setPhase("translate");
+                  }}
+                >
+                  Skip to translate
+                </button>
+              </div>
             )}
           </div>
         </div>

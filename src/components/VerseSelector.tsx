@@ -49,19 +49,32 @@ export function VerseSelector({
   
   const currentVerse = parseInt(verse) || 1;
   const canGoBack = currentVerse > 1;
+  const longestBookName = NT_BOOKS.reduce(
+    (longest, book) => (book.name.length > longest.length ? book.name : longest),
+    ""
+  );
   
   return (
-    <div className="card flex flex-col gap-3">
+    <div className="card mx-auto w-fit max-w-full flex flex-col gap-3">
       <div className="flex gap-2 flex-wrap">
-        <select
-          className="select flex-2 min-w-[180px]"
-          value={selectedBook}
-          onChange={e => onBookChange(e.target.value)}
-        >
-          {NT_BOOKS.map(b => (
-            <option key={b.abbrev} value={b.abbrev}>{b.name}</option>
-          ))}
-        </select>
+        {/* Size the book select to the longest option, not the selected one */}
+        <div className="relative inline-grid max-w-full">
+          <span
+            className="invisible col-start-1 row-start-1 whitespace-pre px-2 py-1 pr-8"
+            aria-hidden
+          >
+            {longestBookName}
+          </span>
+          <select
+            className="select col-start-1 row-start-1 w-full min-w-0"
+            value={selectedBook}
+            onChange={e => onBookChange(e.target.value)}
+          >
+            {NT_BOOKS.map(b => (
+              <option key={b.abbrev} value={b.abbrev}>{b.name}</option>
+            ))}
+          </select>
+        </div>
         <input
           className="input w-20"
           type="number"

@@ -5,7 +5,8 @@ const SYSTEM = [
   "You tutor Koine Greek for someone who has already been shown a signal card.",
   "The gold morphological parse is from MorphGNT and is correct.",
   "Do not offer a different parse, and do not treat any English version as the only right translation.",
-  "Explain from the signal notes and the clause. Be concise, about a short paragraph.",
+  "Explain from the signal notes and the verse word parses. Address the student as you.",
+  "Be concise: one short paragraph.",
 ].join(" ");
 
 export function aiBlock(user: UserRow): "sign_in" | "pending" | "denied" | null {
@@ -19,20 +20,40 @@ export function explainPrompt(body: Record<string, unknown>): string | null {
   const verseRef = asString(body.verseRef, 40);
   const surface = asString(body.surface, 80);
   const signal = asString(body.signal, 4000);
-  const clause = asString(body.clause, 500);
-  if (!verseRef || !surface || !signal || !clause) return null;
+  const verseParses = asString(body.verseParses, 4000);
+  if (!verseRef || !surface || !signal || !verseParses) return null;
   const lemma = asString(body.lemma, 80) ?? "unknown";
   const gold = asString(body.gold, 500) ?? "";
   const guess = asString(body.guess, 500) ?? "";
   const task = body.whole
-    ? "Explain how these fields work together as one parse of this word. Do not change the gold parse."
-    : "Explain this miss or this form. Do not change the gold parse.";
+    ? [
+        "Address the student as you. Write one short paragraph.",
+        "Explain the morphological reason the gold parse has these values:",
+        "endings, agreement with a nearby word (use the verse parses), an irregular lemma, or other cues.",
+        "Do not define the grammatical categories, and do not say what nominative, singular, masculine,",
+        "or similar labels mean in English or for the word's role in the sentence.",
+        "The signal cards already teach those definitions; use them only as morphological cues.",
+        "Do not change the gold parse.",
+      ].join(" ")
+    : [
+        "Address the student as you. Write one short paragraph.",
+        "Explain why the gold value is morphologically correct and your guess is not:",
+        "ending, paradigm, agreement, irregular lemma, or a verse cue.",
+        "If your guessed parse would spell the same Greek surface as the actual word, say that once,",
+        "then explain the cue from another word in the verse (agreement) using the verse parses.",
+        "If your guessed parse would spell a different surface, name that Greek form once",
+        "and contrast it with the actual surface.",
+        "Do not define the grammatical category, and do not say what it means in English",
+        "or as a sentence role (subject, possession, origin, who/what).",
+        "Do not repeat the signal card. Do not ramble. Do not say coincidence.",
+        "Do not change the gold parse.",
+      ].join(" ");
   return [
     `Verse: ${verseRef}`,
     `Word: ${surface} (lemma ${lemma})`,
     `Gold parse: ${gold}`,
     `Student chose: ${guess}`,
-    `Clause: ${clause}`,
+    `Verse parses: ${verseParses}`,
     `Signal card: ${signal}`,
     task,
   ].join("\n");
@@ -51,7 +72,13 @@ export function translationPrompt(body: Record<string, unknown>): string | null 
     `Student English: ${english}`,
     `Parse checklist:\n${checklist}`,
     `Public-domain versions:\n${versions}`,
-    "Say whether the student's English shows the checklist items. Do not grade it as wrong against one version. Note where the versions themselves differ.",
+    [
+      "Say whether the student's English shows the checklist items.",
+      "Also explain briefly what this parse commits the English to in the sentence",
+      "(subject, object, ongoing action, and similar)—that contextual meaning belongs here,",
+      "not on the morphology step.",
+      "Do not grade it as wrong against one version. Note where the versions themselves differ.",
+    ].join(" "),
   ].join("\n");
 }
 

@@ -6,10 +6,12 @@ import { MorphologyCharts } from "./MorphologyCharts";
 export function SignalCard({
   note,
   priorMisses,
+  action,
   children,
 }: {
   note: SignalExplanation;
   priorMisses?: number;
+  action?: ReactNode;
   children?: ReactNode;
 }) {
   const [chartOpen, setChartOpen] = useState(false);
@@ -39,10 +41,15 @@ export function SignalCard({
           {note.grammar.example ? ` ${note.grammar.example}` : ""}
         </p>
       ) : null}
-      {note.chartKey ? (
-        <button type="button" className="btn mt-auto w-fit" onClick={() => setChartOpen(true)}>
-          Open {note.chartLabel ?? "paradigm"}
-        </button>
+      {note.chartKey || action ? (
+        <div className="mt-auto flex flex-wrap items-center gap-2 self-start">
+          {note.chartKey ? (
+            <button type="button" className="btn w-fit" onClick={() => setChartOpen(true)}>
+              Open {note.chartLabel ?? "paradigm"}
+            </button>
+          ) : null}
+          {action}
+        </div>
       ) : null}
       {children}
       {note.chartKey ? (

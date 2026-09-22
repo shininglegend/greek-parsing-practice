@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { explainPrompt, readTutorResult, tutorRequest } from "./tutor";
+import { explainPrompt, readTutorResult, translationPrompt, tutorRequest } from "./tutor";
 
 const PROMPT = "Explain ἦν.";
 
@@ -10,18 +10,59 @@ describe("explainPrompt", () => {
     lemma: "εἰμί",
     gold: "tense: imperfect; mood: indicative",
     guess: "tense: imperfect; mood: indicative",
-    clause: "Ἐν ἀρχῇ ἦν ὁ λόγος",
+    verseParses:
+      "Ἐν (pos: preposition) ἀρχῇ (pos: noun; case: dative; number: singular; gender: feminine) ἦν (pos: verb; tense: imperfect; mood: indicative)",
     signal: "This form is imperfect.",
   };
 
-  it("asks about one form by default", () => {
-    expect(explainPrompt(body)).toContain("Explain this miss or this form.");
+  it("asks why gold is morphologically correct on a miss", () => {
+    const prompt = explainPrompt(body) ?? "";
+    expect(prompt).toContain("Verse parses:");
+    expect(prompt).toContain(body.verseParses);
+    expect(prompt).toContain("Address the student as you. Write one short paragraph.");
+    expect(prompt).toContain(
+      "Explain why the gold value is morphologically correct and your guess is not"
+    );
+    expect(prompt).toContain("ending, paradigm, agreement");
+    expect(prompt).toContain("If your guessed parse would spell the same Greek surface");
+    expect(prompt).toContain("If your guessed parse would spell a different surface");
+    expect(prompt).toContain("Do not define the grammatical category");
+    expect(prompt).toContain("Do not repeat the signal card");
+    expect(prompt).toContain("Do not say coincidence");
+    expect(prompt).not.toContain("Explain this miss or this form.");
+    expect(prompt).not.toContain("Clause:");
   });
 
-  it("asks how the fields fit together for the whole parse", () => {
-    expect(explainPrompt({ ...body, whole: true })).toContain(
-      "Explain how these fields work together as one parse of this word."
+  it("asks why the gold form has those morphological values", () => {
+    const prompt = explainPrompt({ ...body, whole: true }) ?? "";
+    expect(prompt).toContain("Verse parses:");
+    expect(prompt).toContain("Address the student as you. Write one short paragraph.");
+    expect(prompt).toContain("Explain the morphological reason the gold parse has these values");
+    expect(prompt).toContain("agreement with a nearby word (use the verse parses)");
+    expect(prompt).not.toContain("how these fields work together");
+    expect(prompt).toContain("Do not define the grammatical categories");
+    expect(prompt).not.toContain(
+      "Explain why the gold value is morphologically correct and your guess is not"
     );
+  });
+
+  it("rejects a body without verseParses", () => {
+    const { verseParses: _omit, ...rest } = body;
+    expect(explainPrompt(rest)).toBeNull();
+  });
+});
+
+describe("translationPrompt", () => {
+  it("asks for checklist coverage and what the parse commits English to", () => {
+    const prompt = translationPrompt({
+      verseRef: "Jn 1:1",
+      greek: "Ἐν ἀρχῇ ἦν ὁ λόγος",
+      english: "In the beginning was the Word",
+      checklist: "λόγος, nominative: subject",
+      versions: "WEB: In the beginning was the Word.",
+    });
+    expect(prompt).toContain("Say whether the student's English shows the checklist items.");
+    expect(prompt).toContain("what this parse commits the English to in the sentence");
   });
 });
 
