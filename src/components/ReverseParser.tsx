@@ -205,7 +205,7 @@ export function ReverseParser() {
 
   return (
     <>
-      <Header currentMode="reverse" />
+      <Header />
       <div className="mx-auto max-w-7xl p-4 space-y-4">
         <VerseSelector
         selectedBook={selectedBook}

@@ -20,6 +20,7 @@ interface VerseSelectorProps {
   lexiconLoaded?: boolean;
   onLoadLexicon?: () => void;
   loadingLexicon?: boolean;
+  hideSurface?: boolean;
 }
 
 export function VerseSelector({
@@ -40,7 +41,8 @@ export function VerseSelector({
   onNavigate,
   lexiconLoaded,
   onLoadLexicon,
-  loadingLexicon
+  loadingLexicon,
+  hideSurface
 }: VerseSelectorProps) {
   const hasWords = words && words.length > 0;
   const showWordSelection = hasWords && onWordToggle && selectedWordIds;
@@ -163,7 +165,7 @@ export function VerseSelector({
         </>
       )}
       
-      {!hideVerse && !showWordSelection && (
+      {!hideVerse && !hideSurface && !showWordSelection && (
         <div className="text-base text-slate-700">
           <span className="font-mono text-lg">{surfaceLine}</span>
         </div>

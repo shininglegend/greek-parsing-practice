@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local secrets. Do not commit .dev.vars.
+# TURNSTILE_SECRET is optional. When it is unset, tutor and sign-in routes skip the widget.
+TURNSTILE_SECRET=

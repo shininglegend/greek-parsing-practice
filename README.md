@@ -20,40 +20,45 @@ An educational web application for practicing Koine Greek morphological parsing.
 ## Tech Stack
 
 - React 19 + TypeScript
-- Vite for fast development and building
+- Vite and a Cloudflare Worker (static assets plus `/api`)
 - Tailwind CSS for styling
+- D1 for accounts, parse attempts, and the tutor log
+- KV for cached English verses and cached tutor replies
 
 ## Getting Started
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
 ```
+
+`npm run dev` applies the local D1 migrations, then starts Vite. The app is served by the Worker, including `/api`.
+
+Before the first deploy, create the remote database and KV namespace and replace the placeholder ids in `wrangler.jsonc`:
+
+```bash
+npx wrangler d1 create greekparser
+npx wrangler kv namespace create CACHE
+npx wrangler d1 migrations apply DB --remote
+```
+
+Set `ADMIN_EMAILS` to the addresses that should be admins, and `EMAIL_FROM` to a sender on a domain onboarded to Email Sending. An optional Turnstile secret (`TURNSTILE_SECRET`, via `wrangler secret put`) and `TURNSTILE_SITE_KEY` gate tutor calls and magic links. `npm run deploy` publishes the Worker. GitHub Pages is no longer the host.
 
 ## How It Works
 
-1. Enter a Bible verse reference (e.g., "John 1:1")
-2. Each word appears as an expandable card
-3. Select morphological properties from dropdowns
-4. Submit to see your score
-5. Review correct answers highlighted in green, incorrect in red
+1. Load a verse and tap one word at a time
+2. Choose its grammatical features. A miss shows why: the contrast, a cue in the verse when there is one, and what that parse does in English
+3. When the selected words are answered, write an English rendering and compare a gloss line, a parse checklist, and WEB, KJV, and ASV
+4. Weak spots count repeated misses. An approved account can ask for a longer tutor note; every query and reply is stored for the admin dashboard
 
 ## Project Structure
 
-- `src/App.tsx` - Main component with state machine and drill interface
-- `src/api.ts` - Data fetching and API integration layer
+- `src/App.tsx` - Routes for study, reverse parsing, weak spots, and admin
+- `src/signals.ts` - Authored explanations for common misses
+- `worker/` - Session, translations, tutor, and admin API
+- `src/api.ts` - MorphGNT verse loading
 - `src/types.ts` - TypeScript definitions for words, verses, and parse fields
 - `src/utils.ts` - Scoring logic and field specifications
-- `src/index.css` - Tailwind configuration and custom component styles
 
 ## Data Sources
 

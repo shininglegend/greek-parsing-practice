@@ -12,9 +12,10 @@
 }
 
 :root { --card: 0 0% 100%; }
+html { scroll-padding-bottom: 6.5rem; }
 .card { @apply rounded-xl shadow-sm p-4 bg-white; }
-.btn  { @apply px-3 py-1.5 rounded-sm border bg-slate-900 text-white hover:bg-slate-800; }
-.input{ @apply px-3 py-2 rounded-sm border; }
-.select{ @apply px-2 py-1 rounded-sm border bg-white; }
+.btn  { @apply min-h-11 px-3 py-2 rounded-sm border bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50; }
+.input{ @apply min-h-11 px-3 py-2 rounded-sm border; }
+.select{ @apply min-h-11 px-2 py-1 rounded-sm border bg-white; }
 .badge{ @apply inline-block px-2 py-0.5 text-xs rounded-sm bg-slate-100; }
 .font-greek { font-family: 'Gentium Plus', 'Times New Roman', serif; font-size: 1.1em; }

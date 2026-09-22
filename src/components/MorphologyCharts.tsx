@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MORPHOLOGY_CHARTS } from "../data/morphologyCharts";
 
-export function MorphologyCharts() {
-  const [activeChart, setActiveChart] = useState<string>("article");
+export function MorphologyCharts({ initialChart = "article" }: { initialChart?: string }) {
+  const [activeChart, setActiveChart] = useState<string>(initialChart);
+
+  useEffect(() => {
+    setActiveChart(initialChart);
+  }, [initialChart]);
 
   const charts = [
     { key: "article", label: "Article" },
@@ -20,10 +24,9 @@ export function MorphologyCharts() {
   const currentChart = MORPHOLOGY_CHARTS[activeChart as keyof typeof MORPHOLOGY_CHARTS];
 
   return (
-    <div className="flex gap-3">
-      {/* Sidebar navigation */}
-      <nav className="w-32 shrink-0">
-        <ul className="space-y-1">
+    <div className="flex flex-col sm:flex-row gap-3">
+      <nav className="sm:w-36 sm:shrink-0">
+        <ul className="flex sm:flex-col gap-1 overflow-x-auto">
           {charts.map(chart => (
             <li key={chart.key}>
               <button

@@ -22,13 +22,13 @@ export function Help() {
             Parser Drill Mode
           </h4>
           <p>
-            For each Greek word, expand the section using the + icon, then
-            select the correct grammatical features from the dropdown menus
-            (part of speech, case, number, etc.). Your selections are checked in
-            real-time—correct answers show green borders, incorrect ones remain
-            white. Toggle words on/off using the checkboxes in the verse display
-            to focus on specific words. Your score appears below showing how
-            many fields you got correct.
+            Tap a word in the verse, then choose its grammatical features.
+            A miss opens a signal card: the contrast, the cue in the verse when
+            there is one, and what that parse does in English. When every
+            selected word has an answer, write an English rendering and compare
+            it with a gloss line, a parse checklist, and WEB, KJV, and ASV.
+            The app does not grade your English. A longer tutor note is
+            available only on an approved account.
           </p>
         </section>
 
