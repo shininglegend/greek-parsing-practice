@@ -52,6 +52,8 @@ export function translationPrompt(body: Record<string, unknown>): string | null 
   ].join("\n");
 }
 
+const PARAGRAPH_TOKENS = 1024;
+
 type Usage = {
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -59,18 +61,61 @@ type Usage = {
   output_tokens?: number;
 };
 
-function readModel(result: unknown): { text: string; input: number; output: number } {
-  if (!result || typeof result !== "object") return { text: "", input: 0, output: 0 };
-  const record = result as { response?: unknown; result?: unknown; usage?: Usage };
-  const text =
-    typeof record.response === "string"
-      ? record.response
-      : typeof record.result === "string"
-        ? record.result
-        : "";
-  const usage = record.usage;
+export function tutorRequest(model: string, prompt: string): Record<string, unknown> {
+  // Anthropic Messages puts the system prompt beside the messages and requires max_tokens.
+  if (model.startsWith("anthropic/")) {
+    return {
+      max_tokens: PARAGRAPH_TOKENS,
+      system: SYSTEM,
+      messages: [{ role: "user", content: prompt }],
+    };
+  }
   return {
-    text: text.trim(),
+    max_tokens: PARAGRAPH_TOKENS,
+    messages: [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: prompt },
+    ],
+  };
+}
+
+function textFrom(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return "";
+  const record = value as {
+    response?: unknown;
+    result?: unknown;
+    content?: unknown;
+    choices?: unknown;
+  };
+  if (typeof record.response === "string") return record.response;
+  if (typeof record.result === "string") return record.result;
+  if (Array.isArray(record.content)) {
+    return record.content
+      .map((block) => {
+        if (!block || typeof block !== "object") return "";
+        const item = block as { type?: string; text?: string };
+        if (item.type && item.type !== "text") return "";
+        return item.text ?? "";
+      })
+      .join("");
+  }
+  if (Array.isArray(record.choices)) {
+    const first = record.choices[0] as
+      | { text?: unknown; message?: { content?: unknown } }
+      | undefined;
+    if (typeof first?.text === "string") return first.text;
+    if (typeof first?.message?.content === "string") return first.message.content;
+  }
+  return "";
+}
+
+export function readTutorResult(result: unknown): { text: string; input: number; output: number } {
+  if (typeof result === "string") return { text: result.trim(), input: 0, output: 0 };
+  if (!result || typeof result !== "object") return { text: "", input: 0, output: 0 };
+  const usage = (result as { usage?: Usage }).usage;
+  return {
+    text: textFrom(result).trim(),
     input: usage?.prompt_tokens ?? usage?.input_tokens ?? 0,
     output: usage?.completion_tokens ?? usage?.output_tokens ?? 0,
   };
@@ -122,7 +167,8 @@ export async function runTutor(
   kind: "explain" | "translation",
   prompt: string
 ): Promise<{ reply: string } | { error: "cap" | "model"; message: string }> {
-  const cacheKey = `ai:${await sha256(`${kind}\n${prompt}`)}`;
+  const model: string = env.AI_MODEL;
+  const cacheKey = `ai:${await sha256(`${model}\n${kind}\n${prompt}`)}`;
   const cached = await env.CACHE.get(cacheKey);
   if (cached) {
     await logCall(env, user.id, kind, prompt, cached, 0, 0, true);
@@ -139,22 +185,15 @@ export async function runTutor(
 
   let result: unknown;
   try {
-    result = await env.AI.run(
-      env.AI_MODEL,
-      {
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: prompt },
-        ],
-      },
-      { gateway: { id: env.AI_GATEWAY_ID || "default" } }
-    );
+    result = await env.AI.run(model, tutorRequest(model, prompt), {
+      gateway: { id: env.AI_GATEWAY_ID || "default" },
+    });
   } catch (error) {
     console.error(error);
     return { error: "model", message: "The tutor could not answer just now." };
   }
 
-  const read = readModel(result);
+  const read = readTutorResult(result);
   if (!read.text) {
     return { error: "model", message: "The tutor returned an empty answer." };
   }

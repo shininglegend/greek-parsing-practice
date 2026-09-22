@@ -256,7 +256,7 @@ export function VerseSession() {
   return (
     <>
       <Header />
-      <div className="mx-auto max-w-lg p-4 pb-36 space-y-4">
+      <div className="w-full p-4 pb-36 space-y-4">
         <VerseSelector
           selectedBook={selectedBook}
           chapter={chapter}
@@ -418,7 +418,7 @@ export function VerseSession() {
 
       {verseData && wordsToShow.length > 0 && (
         <div className="fixed bottom-0 inset-x-0 border-t bg-white">
-          <div className="mx-auto max-w-lg px-4 py-3 flex items-center justify-between gap-2">
+          <div className="w-full px-4 py-3 flex items-center justify-between gap-2">
             <div className="text-sm text-slate-600">
               {score.total > 0 ? `${score.correct}/${score.total}` : "Parse"}
             </div>
