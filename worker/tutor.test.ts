@@ -1,7 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { readTutorResult, tutorRequest } from "./tutor";
+import { explainPrompt, readTutorResult, tutorRequest } from "./tutor";
 
 const PROMPT = "Explain ἦν.";
+
+describe("explainPrompt", () => {
+  const body = {
+    verseRef: "Jn 1:1",
+    surface: "ἦν",
+    lemma: "εἰμί",
+    gold: "tense: imperfect; mood: indicative",
+    guess: "tense: imperfect; mood: indicative",
+    clause: "Ἐν ἀρχῇ ἦν ὁ λόγος",
+    signal: "This form is imperfect.",
+  };
+
+  it("asks about one form by default", () => {
+    expect(explainPrompt(body)).toContain("Explain this miss or this form.");
+  });
+
+  it("asks how the fields fit together for the whole parse", () => {
+    expect(explainPrompt({ ...body, whole: true })).toContain(
+      "Explain how these fields work together as one parse of this word."
+    );
+  });
+});
 
 describe("tutorRequest", () => {
   it("sends Workers AI a system message in the list", () => {

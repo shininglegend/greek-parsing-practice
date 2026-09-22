@@ -74,7 +74,7 @@ function WordButton({
     <button
       type="button"
       onClick={onSelect}
-      className={`min-h-11 px-1 rounded-md ${
+      className={`px-1 rounded-md ${
         active ? "bg-slate-900 text-white" : selected ? "text-slate-900" : "text-slate-400"
       } ${marked ? "underline decoration-amber-500 decoration-2" : ""}`}
     >
@@ -269,6 +269,24 @@ export function VerseSession() {
 
   async function explainFurther() {
     if (!note || !active || !verseData) return;
+    await askAbout(note, {
+      gold: `${miss?.field}: ${normalizeMissing(active.parse?.[miss?.field ?? "pos"])}`,
+      guess: `${miss?.field}: ${normalizeMissing(answers[active.id]?.[miss?.field ?? "pos"])}`,
+    });
+  }
+
+  async function explainWhole() {
+    if (!active || !verseData || correctNotes.length === 0) return;
+    const parse = correctNotes.map((item) => item.title).join("; ");
+    await askAbout(correctNotes, { gold: parse, guess: parse, whole: true });
+  }
+
+  async function askAbout(
+    notes: SignalExplanation | SignalExplanation[],
+    extra: { gold: string; guess: string; whole?: boolean }
+  ) {
+    if (!active || !verseData) return;
+    const cards = Array.isArray(notes) ? notes : [notes];
     setTutorLoading(true);
     setTutorError(null);
     try {
@@ -276,10 +294,11 @@ export function VerseSession() {
         verseRef: verseData.ref,
         surface: active.surface,
         lemma: active.lemma,
-        gold: `${miss?.field}: ${normalizeMissing(active.parse?.[miss?.field ?? "pos"])}`,
-        guess: `${miss?.field}: ${normalizeMissing(answers[active.id]?.[miss?.field ?? "pos"])}`,
+        gold: extra.gold,
+        guess: extra.guess,
+        whole: extra.whole ?? false,
         clause: verseData.words.map((word) => word.surface).join(" "),
-        signal: signalText(note),
+        signal: cards.map(signalText).join("\n\n"),
         turnstileToken: token,
       });
       setTutorReply(result.reply);
@@ -349,7 +368,7 @@ export function VerseSession() {
 
         {verseData && wordsToShow.length > 0 && phase === "parse" && active && (
           <>
-            <div className="font-greek text-2xl leading-relaxed flex flex-wrap items-baseline gap-x-3 gap-y-3">
+            <div className="font-greek text-2xl leading-relaxed mx-auto flex w-fit max-w-full flex-wrap items-baseline gap-x-3 gap-y-3">
               {verseSegments(verseData.words, pairs).map((segment) => {
                 if (segment.kind === "pair") {
                   const head = verseData.words.find((word) => word.id === segment.pair.headId);
@@ -357,7 +376,7 @@ export function VerseSession() {
                     <span
                       key={segment.pair.articleId}
                       title={head ? `Agrees with ${plainSurface(head.surface)}` : undefined}
-                      className="relative inline-flex items-baseline gap-x-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-0.5 after:-translate-y-1 after:rounded-full after:bg-sky-400"
+                      className="inline-flex items-baseline gap-x-1 rounded-full border border-sky-400 px-[1.5px] py-px"
                     >
                       {segment.words.map((word) => (
                         <WordButton
@@ -387,7 +406,7 @@ export function VerseSession() {
               })}
             </div>
 
-            <div className="card w-fit max-w-full space-y-2 p-3">
+            <div className="card mx-auto w-fit max-w-full space-y-2 p-3">
               <div className="flex items-baseline justify-between gap-3">
                 <div className="font-greek text-3xl">{active.surface}</div>
                 {active.lemma && (
@@ -506,11 +525,44 @@ export function VerseSession() {
               </button>
             )}
             {correctNotes.length > 1 && (
-              <p className="text-sm font-medium text-slate-800">The whole parse</p>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <p className="text-sm font-medium text-slate-800">The whole parse</p>
+                  {approved ? (
+                    <button
+                      type="button"
+                      className="btn text-sm"
+                      disabled={tutorLoading || (Boolean(turnstileSiteKey) && !token)}
+                      onClick={explainWhole}
+                    >
+                      {tutorLoading ? "Asking…" : "Explain the full parse"}
+                    </button>
+                  ) : (
+                    <button type="button" className="btn text-sm opacity-60" disabled>
+                      {user?.status === "pending"
+                        ? "Waiting for approval"
+                        : user?.status === "denied"
+                          ? "Tutor notes are off for this account"
+                          : "Sign in to ask the tutor"}
+                    </button>
+                  )}
+                </div>
+                {approved && <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />}
+              </div>
             )}
-            {correctNotes.map((item) => (
-              <SignalCard key={item.title} note={item} />
-            ))}
+            {(tutorError || tutorReply) && correctNotes.length > 1 && (
+              <div className="space-y-2">
+                {tutorError && <p className="text-sm text-red-700">{tutorError}</p>}
+                {tutorReply && <p className="text-sm whitespace-pre-wrap">{tutorReply}</p>}
+              </div>
+            )}
+            {correctNotes.length > 0 && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {correctNotes.map((item) => (
+                  <SignalCard key={item.title} note={item} />
+                ))}
+              </div>
+            )}
           </>
         )}
 

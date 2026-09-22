@@ -24,6 +24,9 @@ export function explainPrompt(body: Record<string, unknown>): string | null {
   const lemma = asString(body.lemma, 80) ?? "unknown";
   const gold = asString(body.gold, 500) ?? "";
   const guess = asString(body.guess, 500) ?? "";
+  const task = body.whole
+    ? "Explain how these fields work together as one parse of this word. Do not change the gold parse."
+    : "Explain this miss or this form. Do not change the gold parse.";
   return [
     `Verse: ${verseRef}`,
     `Word: ${surface} (lemma ${lemma})`,
@@ -31,7 +34,7 @@ export function explainPrompt(body: Record<string, unknown>): string | null {
     `Student chose: ${guess}`,
     `Clause: ${clause}`,
     `Signal card: ${signal}`,
-    "Explain this miss or this form. Do not change the gold parse.",
+    task,
   ].join("\n");
 }
 

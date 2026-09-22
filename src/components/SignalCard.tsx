@@ -14,7 +14,7 @@ export function SignalCard({
 }) {
   const [chartOpen, setChartOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2 text-sm">
+    <div className="flex h-full flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
       <div className="font-semibold text-slate-900">{note.title}</div>
       {priorMisses && priorMisses > 0 ? (
         <p className="font-medium text-amber-950">
@@ -40,7 +40,7 @@ export function SignalCard({
         </p>
       ) : null}
       {note.chartKey ? (
-        <button type="button" className="btn" onClick={() => setChartOpen(true)}>
+        <button type="button" className="btn mt-auto w-fit" onClick={() => setChartOpen(true)}>
           Open {note.chartLabel ?? "paradigm"}
         </button>
       ) : null}

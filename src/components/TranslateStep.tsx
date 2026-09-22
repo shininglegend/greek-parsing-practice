@@ -75,7 +75,7 @@ export function TranslateStep({ verse, words }: { verse: Verse; words: Word[] })
             ));
             if (segment.kind === "pair") {
               return (
-                <div key={segment.pair.articleId} className="relative flex gap-x-3 after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-0.5 after:-translate-y-1 after:rounded-full after:bg-sky-400">
+                <div key={segment.pair.articleId} className="flex gap-x-3 rounded-full border border-sky-400 px-[1.5px] py-px">
                   {glosses}
                 </div>
               );

@@ -21,8 +21,14 @@
 		"AI_GATEWAY_ID": "greekparser",
 		"ADMIN_EMAILS": ["jvctext@gmail.com"],
 		"EMAIL_FROM": "accounts@greek.titusmurphy.com",
-		"TURNSTILE_SITE_KEY": ""
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAFAH8JAA0hXpKQry"
 	},
+	"routes": [
+		{
+			"pattern": "greek.titusmurphy.com",
+			"custom_domain": true
+		}
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",
