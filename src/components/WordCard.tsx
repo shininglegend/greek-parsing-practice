@@ -47,7 +47,7 @@ export function WordCard({ w, answer, onChange, disabled }: WordCardProps) {
           >
             lemma: {w.lemma}
             {w.definition?.brief && (
-              <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-slate-800 text-white text-xs rounded px-2 py-1 whitespace-normal max-w-xs z-10 shadow-lg">
+              <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-slate-800 text-white text-xs rounded-sm px-2 py-1 whitespace-normal max-w-xs z-10 shadow-lg">
                 {w.definition.brief}
               </div>
             )}

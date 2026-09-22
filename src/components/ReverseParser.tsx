@@ -365,7 +365,7 @@ export function ReverseParser() {
                       {displayFields.map((field, idx) => (
                         <div
                           key={idx}
-                          className="text-xs text-center p-0.5 bg-slate-100 rounded"
+                          className="text-xs text-center p-0.5 bg-slate-100 rounded-sm"
                         >
                           <div className="font-medium text-slate-600 text-[10px] leading-tight">
                             {field.label}

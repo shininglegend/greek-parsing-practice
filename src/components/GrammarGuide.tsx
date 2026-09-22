@@ -20,13 +20,13 @@ export function GrammarGuide() {
   return (
     <div className="flex gap-3">
       {/* Sidebar navigation */}
-      <nav className="w-32 flex-shrink-0">
+      <nav className="w-32 shrink-0">
         <ul className="space-y-1">
           {sections.map(section => (
             <li key={section.key}>
               <button
                 onClick={() => setActiveSection(section.key)}
-                className={`w-full text-left px-3 py-2 rounded transition-colors ${
+                className={`w-full text-left px-3 py-2 rounded-sm transition-colors ${
                   activeSection === section.key
                     ? "bg-blue-100 text-blue-700 font-medium"
                     : "hover:bg-slate-100 text-slate-700"

@@ -18,7 +18,7 @@ export function Header({ currentMode }: HeaderProps) {
 
   return (
     <>
-      <div className="sticky top-0 z-50 bg-white border-b shadow-sm">
+      <div className="sticky top-0 z-50 bg-white border-b shadow-xs">
         <div className="mx-auto max-w-5xl p-4">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold">Koine Parser Drill</h1>

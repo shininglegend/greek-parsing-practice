@@ -22,13 +22,13 @@ export function MorphologyCharts() {
   return (
     <div className="flex gap-3">
       {/* Sidebar navigation */}
-      <nav className="w-32 flex-shrink-0">
+      <nav className="w-32 shrink-0">
         <ul className="space-y-1">
           {charts.map(chart => (
             <li key={chart.key}>
               <button
                 onClick={() => setActiveChart(chart.key)}
-                className={`w-full text-left px-2 py-2 rounded text-sm transition-colors ${
+                className={`w-full text-left px-2 py-2 rounded-sm text-sm transition-colors ${
                   activeChart === chart.key
                     ? "bg-blue-100 text-blue-700 font-medium"
                     : "hover:bg-slate-100 text-slate-700"

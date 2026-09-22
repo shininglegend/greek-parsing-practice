@@ -126,13 +126,13 @@ export function VerseSelector({
             <div className="flex gap-2">
               <button 
                 onClick={() => words.forEach(w => !selectedWordIds.has(w.id) && onWordToggle(w.id))}
-                className="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-50"
+                className="text-xs px-2 py-1 rounded-sm border border-slate-300 hover:bg-slate-50"
               >
                 Select All
               </button>
               <button 
                 onClick={() => words.forEach(w => selectedWordIds.has(w.id) && onWordToggle(w.id))}
-                className="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-50"
+                className="text-xs px-2 py-1 rounded-sm border border-slate-300 hover:bg-slate-50"
               >
                 Clear All
               </button>

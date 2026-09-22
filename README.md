@@ -19,7 +19,7 @@ An educational web application for practicing Koine Greek morphological parsing.
 
 ## Tech Stack
 
-- React 18 + TypeScript
+- React 19 + TypeScript
 - Vite for fast development and building
 - Tailwind CSS for styling
 
