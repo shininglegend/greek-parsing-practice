@@ -1,0 +1,55 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "greekparser",
+	"compatibility_date": "2026-09-22",
+	"main": "./worker/index.ts",
+	"observability": {
+		"enabled": true,
+		"traces": {
+			"enabled": true
+		}
+	},
+	"assets": {
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": [
+			"/api/*"
+		]
+	},
+	"vars": {
+		"AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+		"AI_GATEWAY_ID": "greekparser",
+		"ADMIN_EMAILS": ["jvctext@gmail.com"],
+		"EMAIL_FROM": "accounts@greek.titusmurphy.com",
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAFAH8JAA0hXpKQry"
+	},
+	"routes": [
+		{
+			"pattern": "greek.titusmurphy.com",
+			"custom_domain": true
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "greekparser",
+			"database_id": "699c592a-2cce-46e3-9bf7-5aeb87759c8b",
+			"migrations_dir": "migrations"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "CACHE",
+			"id": "884b4e460d7445a292bd0d1162fa1ef7"
+		}
+	],
+	"ai": {
+		"binding": "AI"
+	},
+	"send_email": [
+		{
+			"name": "EMAIL",
+			"remote": true
+		}
+	]
+}

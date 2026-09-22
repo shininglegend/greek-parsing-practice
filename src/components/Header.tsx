@@ -1,66 +1,136 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useSession } from "../session";
+import { ApiError, logout, sendMagicLink } from "../studyApi";
 import { GrammarGuide, Help, Modal, MorphologyCharts } from "./";
+import { TurnstileField } from "./TurnstileField";
 
-interface HeaderProps {
-  currentMode: "drill" | "reverse";
-}
-
-export function Header({ currentMode }: HeaderProps) {
+export function Header() {
+  const [params] = useSearchParams();
+  const { user, turnstileSiteKey, refresh } = useSession();
+  const [menuOpen, setMenuOpen] = useState(false);
   const [showGrammarGuide, setShowGrammarGuide] = useState(false);
   const [showMorphologyCharts, setShowMorphologyCharts] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [token, setToken] = useState("");
+  const [authMessage, setAuthMessage] = useState<string | null>(
+    params.get("auth") === "invalid" ? "That sign-in link has expired." : null
+  );
+  const [sending, setSending] = useState(false);
 
-  const navigateToMode = (mode: "drill" | "reverse") => {
-    const hash = mode === "drill" ? "#/" : "#/reverse";
-    window.history.pushState({}, "", hash);
-    window.dispatchEvent(new Event("locationchange"));
-  };
+  function closeMenu() {
+    setMenuOpen(false);
+  }
+
+  async function submitEmail(event: FormEvent) {
+    event.preventDefault();
+    setSending(true);
+    setAuthMessage(null);
+    try {
+      await sendMagicLink(email, token);
+      setAuthMessage("Check your email for a sign-in link.");
+    } catch (error) {
+      setAuthMessage(error instanceof ApiError ? error.message : "Could not send the link.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function signOut() {
+    await logout();
+    await refresh();
+    setAuthMessage(null);
+  }
+
+  const linkClass = "min-h-11 flex items-center text-sm";
 
   return (
     <>
-      <div className="sticky top-0 z-50 bg-white border-b shadow-xs">
-        <div className="mx-auto max-w-5xl p-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold">Koine Parser Drill</h1>
-            <button onClick={() => setShowHelp(true)} className="btn text-sm">
+      <header className="sticky top-0 z-50 bg-white border-b">
+        <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between gap-3">
+          <Link to="/" className="text-lg font-bold" onClick={closeMenu}>
+            Koine Parser
+          </Link>
+          <button
+            type="button"
+            className="btn"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            Menu
+          </button>
+        </div>
+        {menuOpen && (
+          <nav className="mx-auto max-w-5xl px-4 pb-4 flex flex-col gap-1 border-t">
+            <Link to="/" className={linkClass} onClick={closeMenu}>
+              Study
+            </Link>
+            <Link to="/reverse" className={linkClass} onClick={closeMenu}>
+              Reverse parser
+            </Link>
+            <Link to="/weak-spots" className={linkClass} onClick={closeMenu}>
+              Weak spots
+            </Link>
+            <button type="button" className={`${linkClass} text-left`} onClick={() => { closeMenu(); setShowHelp(true); }}>
               Help
             </button>
-            <button
-              onClick={() => setShowMorphologyCharts(true)}
-              className="btn text-sm"
-            >
-              Morphology Charts
+            <button type="button" className={`${linkClass} text-left`} onClick={() => { closeMenu(); setShowMorphologyCharts(true); }}>
+              Morphology charts
             </button>
-            <button
-              onClick={() => setShowGrammarGuide(true)}
-              className="btn text-sm"
-            >
-              Grammar Guide
+            <button type="button" className={`${linkClass} text-left`} onClick={() => { closeMenu(); setShowGrammarGuide(true); }}>
+              Grammar guide
             </button>
-            {currentMode === "drill" ? (
-              <button
-                onClick={() => navigateToMode("reverse")}
-                className="text-sm text-blue-600 hover:underline"
-              >
-                Try Reverse Parser →
-              </button>
-            ) : (
-              <button
-                onClick={() => navigateToMode("drill")}
-                className="text-sm text-blue-600 hover:underline"
-              >
-                ← Back to Parser Drill
-              </button>
+            {user?.role === "admin" && (
+              <Link to="/admin" className={linkClass} onClick={closeMenu}>
+                Admin
+              </Link>
             )}
-          </div>
-        </div>
-      </div>
+            <div className="border-t pt-3 mt-2 space-y-2">
+              {user?.email ? (
+                <>
+                  <p className="text-sm">
+                    {user.email}
+                    {user.status === "pending" ? " — waiting for approval" : ""}
+                    {user.status === "denied" ? " — tutor off" : ""}
+                    {user.status === "approved" ? " — approved" : ""}
+                  </p>
+                  <button type="button" className="btn" onClick={signOut}>
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <form className="space-y-2" onSubmit={submitEmail}>
+                  <label className="block text-sm">
+                    Email
+                    <input
+                      className="input w-full mt-1"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      autoComplete="email"
+                    />
+                  </label>
+                  <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
+                  <button
+                    type="submit"
+                    className="btn"
+                    disabled={sending || (Boolean(turnstileSiteKey) && !token)}
+                  >
+                    {sending ? "Sending…" : "Email me a sign-in link"}
+                  </button>
+                </form>
+              )}
+              {authMessage && <p className="text-sm text-slate-700">{authMessage}</p>}
+            </div>
+          </nav>
+        )}
+      </header>
 
-      {/* Modals */}
       <Modal isOpen={showHelp} onClose={() => setShowHelp(false)} title="Help">
         <Help />
       </Modal>
-
       <Modal
         isOpen={showMorphologyCharts}
         onClose={() => setShowMorphologyCharts(false)}
@@ -68,7 +138,6 @@ export function Header({ currentMode }: HeaderProps) {
       >
         <MorphologyCharts />
       </Modal>
-
       <Modal
         isOpen={showGrammarGuide}
         onClose={() => setShowGrammarGuide(false)}

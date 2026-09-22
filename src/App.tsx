@@ -1,33 +1,22 @@
-import { useEffect, useState } from "react";
-import { ParserDrill, ReverseParser } from "./components";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Admin } from "./components/Admin";
+import { ReverseParser } from "./components/ReverseParser";
+import { VerseSession } from "./components/VerseSession";
+import { WeakSpots } from "./components/WeakSpots";
+import { SessionProvider } from "./session";
 
 export default function App() {
-  const [currentPath, setCurrentPath] = useState(window.location.hash || "#/");
-
-  // Simple client-side routing without react-router
-  // Handle hash-based navigation for SPA compatibility
-  useEffect(() => {
-    const handleLocationChange = () => {
-      setCurrentPath(window.location.hash || "#/");
-    };
-
-    const handlePopState = () => {
-      handleLocationChange();
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    window.addEventListener("locationchange", handleLocationChange);
-
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-      window.removeEventListener("locationchange", handleLocationChange);
-    };
-  }, []);
-
-  // Render based on path
-  if (currentPath === "#/reverse") {
-    return <ReverseParser />;
-  }
-
-  return <ParserDrill />;
+  return (
+    <BrowserRouter>
+      <SessionProvider>
+        <Routes>
+          <Route path="/" element={<VerseSession />} />
+          <Route path="/reverse" element={<ReverseParser />} />
+          <Route path="/weak-spots" element={<WeakSpots />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/:userId" element={<Admin />} />
+        </Routes>
+      </SessionProvider>
+    </BrowserRouter>
+  );
 }

@@ -1,5 +1,10 @@
+import { useRef } from "react";
 import { NT_BOOKS } from "../utils";
 import type { Word } from "../types";
+
+function isPositiveInteger(value: string): boolean {
+  return /^[1-9]\d*$/.test(value.trim());
+}
 
 interface VerseSelectorProps {
   selectedBook: string;
@@ -20,6 +25,7 @@ interface VerseSelectorProps {
   lexiconLoaded?: boolean;
   onLoadLexicon?: () => void;
   loadingLexicon?: boolean;
+  hideSurface?: boolean;
 }
 
 export function VerseSelector({
@@ -40,32 +46,70 @@ export function VerseSelector({
   onNavigate,
   lexiconLoaded,
   onLoadLexicon,
-  loadingLexicon
+  loadingLexicon,
+  hideSurface
 }: VerseSelectorProps) {
   const hasWords = words && words.length > 0;
   const showWordSelection = hasWords && onWordToggle && selectedWordIds;
   
   const currentVerse = parseInt(verse) || 1;
   const canGoBack = currentVerse > 1;
+  const focusedValue = useRef({ chapter, verse });
+
+  function onFieldFocus() {
+    focusedValue.current = { chapter, verse };
+  }
+
+  function commitFields() {
+    const previous = focusedValue.current;
+    const next = { chapter, verse };
+    focusedValue.current = next;
+    if (previous.chapter === next.chapter && previous.verse === next.verse) return;
+    // An incomplete reference waits for Load or another edit.
+    if (!isPositiveInteger(chapter) || !isPositiveInteger(verse)) return;
+    onLoad();
+  }
+
+  function onFieldKeyDown(event: { key: string; preventDefault: () => void }) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    commitFields();
+  }
+  const longestBookName = NT_BOOKS.reduce(
+    (longest, book) => (book.name.length > longest.length ? book.name : longest),
+    ""
+  );
   
   return (
-    <div className="card flex flex-col gap-3">
+    <div className="card mx-auto w-fit max-w-full flex flex-col gap-3">
       <div className="flex gap-2 flex-wrap">
-        <select
-          className="select flex-2 min-w-[180px]"
-          value={selectedBook}
-          onChange={e => onBookChange(e.target.value)}
-        >
-          {NT_BOOKS.map(b => (
-            <option key={b.abbrev} value={b.abbrev}>{b.name}</option>
-          ))}
-        </select>
+        {/* Size the book select to the longest option, not the selected one */}
+        <div className="relative inline-grid max-w-full">
+          <span
+            className="invisible col-start-1 row-start-1 whitespace-pre px-2 py-1 pr-8"
+            aria-hidden
+          >
+            {longestBookName}
+          </span>
+          <select
+            className="select col-start-1 row-start-1 w-full min-w-0"
+            value={selectedBook}
+            onChange={e => onBookChange(e.target.value)}
+          >
+            {NT_BOOKS.map(b => (
+              <option key={b.abbrev} value={b.abbrev}>{b.name}</option>
+            ))}
+          </select>
+        </div>
         <input
           className="input w-20"
           type="number"
           min="1"
           value={chapter}
           onChange={e => onChapterChange(e.target.value)}
+          onFocus={onFieldFocus}
+          onBlur={commitFields}
+          onKeyDown={onFieldKeyDown}
           placeholder="Ch"
         />
         <span className="flex items-center">:</span>
@@ -75,6 +119,9 @@ export function VerseSelector({
           min="1"
           value={verse}
           onChange={e => onVerseChange(e.target.value)}
+          onFocus={onFieldFocus}
+          onBlur={commitFields}
+          onKeyDown={onFieldKeyDown}
           placeholder="Vs"
         />
         <button className="btn" onClick={onLoad}>Load</button>
@@ -163,7 +210,7 @@ export function VerseSelector({
         </>
       )}
       
-      {!hideVerse && !showWordSelection && (
+      {!hideVerse && !hideSurface && !showWordSelection && (
         <div className="text-base text-slate-700">
           <span className="font-mono text-lg">{surfaceLine}</span>
         </div>
