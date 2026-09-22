@@ -1,5 +1,10 @@
+import { useRef } from "react";
 import { NT_BOOKS } from "../utils";
 import type { Word } from "../types";
+
+function isPositiveInteger(value: string): boolean {
+  return /^[1-9]\d*$/.test(value.trim());
+}
 
 interface VerseSelectorProps {
   selectedBook: string;
@@ -49,6 +54,27 @@ export function VerseSelector({
   
   const currentVerse = parseInt(verse) || 1;
   const canGoBack = currentVerse > 1;
+  const focusedValue = useRef({ chapter, verse });
+
+  function onFieldFocus() {
+    focusedValue.current = { chapter, verse };
+  }
+
+  function commitFields() {
+    const previous = focusedValue.current;
+    const next = { chapter, verse };
+    focusedValue.current = next;
+    if (previous.chapter === next.chapter && previous.verse === next.verse) return;
+    // An incomplete reference waits for Load or another edit.
+    if (!isPositiveInteger(chapter) || !isPositiveInteger(verse)) return;
+    onLoad();
+  }
+
+  function onFieldKeyDown(event: { key: string; preventDefault: () => void }) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    commitFields();
+  }
   const longestBookName = NT_BOOKS.reduce(
     (longest, book) => (book.name.length > longest.length ? book.name : longest),
     ""
@@ -81,6 +107,9 @@ export function VerseSelector({
           min="1"
           value={chapter}
           onChange={e => onChapterChange(e.target.value)}
+          onFocus={onFieldFocus}
+          onBlur={commitFields}
+          onKeyDown={onFieldKeyDown}
           placeholder="Ch"
         />
         <span className="flex items-center">:</span>
@@ -90,6 +119,9 @@ export function VerseSelector({
           min="1"
           value={verse}
           onChange={e => onVerseChange(e.target.value)}
+          onFocus={onFieldFocus}
+          onBlur={commitFields}
+          onKeyDown={onFieldKeyDown}
           placeholder="Vs"
         />
         <button className="btn" onClick={onLoad}>Load</button>

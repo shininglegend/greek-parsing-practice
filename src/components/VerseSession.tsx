@@ -27,15 +27,31 @@ type LoadState =
   | { kind: "loaded"; verse: Verse }
   | { kind: "error"; msg: string };
 
-function initialRef(search: string) {
-  const ref = new URLSearchParams(search).get("ref");
+const VERSE_KEY = "greekparser.verse";
+
+function parseRef(ref: string | null | undefined) {
   const normalized = ref?.trim().replace(/(\d)\.(\d+)$/, "$1:$2");
   const match = normalized?.match(/^(.+)\s+(\d+):(\d+)$/);
-  if (!match) return { book: "Jn", chapter: "1", verse: "1" };
+  if (!match) return null;
   const book =
     NT_BOOKS.find((entry) => entry.abbrev === match[1] || entry.name === match[1])?.abbrev ??
-    "Jn";
+    null;
+  if (!book) return null;
   return { book, chapter: match[2], verse: match[3] };
+}
+
+function savedRef() {
+  try {
+    return parseRef(localStorage.getItem(VERSE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function initialRef(search: string) {
+  const ref = new URLSearchParams(search).get("ref");
+  if (ref) return parseRef(ref) ?? { book: "Jn", chapter: "1", verse: "1" };
+  return savedRef() ?? { book: "Jn", chapter: "1", verse: "1" };
 }
 
 const PARSE_KEYS: (keyof ParseFields)[] = [
@@ -109,7 +125,7 @@ function WordButton({
 
 export function VerseSession() {
   const { user, turnstileSiteKey } = useSession();
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const start = initialRef(params.toString());
   const [selectedBook, setSelectedBook] = useState(start.book);
   const [chapter, setChapter] = useState(start.chapter);
@@ -167,6 +183,14 @@ export function VerseSession() {
       setState({ kind: "loaded", verse: withGlosses });
       setSelectedWordIds(new Set(withGlosses.words.map((word) => word.id)));
       setActiveId(withGlosses.words[0]?.id ?? null);
+      try {
+        localStorage.setItem(VERSE_KEY, formatted);
+      } catch {
+        // Private mode can reject storage; the URL still keeps the verse.
+      }
+      if (params.get("ref") !== formatted) {
+        setSearchParams({ ref: formatted }, { replace: true });
+      }
     } catch (error) {
       setState({
         kind: "error",
