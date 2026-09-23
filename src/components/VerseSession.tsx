@@ -19,7 +19,6 @@ import {
 import { Footer, Header, Modal, VerseSelector } from "./";
 import { SignalCard } from "./SignalCard";
 import { TranslateStep } from "./TranslateStep";
-import { TurnstileField } from "./TurnstileField";
 import { progressForVerse, readProgress, writeProgress } from "../verseProgress";
 
 type LoadState =
@@ -144,7 +143,7 @@ function WordButton({
 }
 
 export function VerseSession() {
-  const { user, turnstileSiteKey } = useSession();
+  const { user } = useSession();
   const [params, setSearchParams] = useSearchParams();
   const start = initialRef(params.toString());
   const [selectedBook, setSelectedBook] = useState(start.book);
@@ -165,7 +164,6 @@ export function VerseSession() {
   const [tutorReply, setTutorReply] = useState<string | null>(null);
   const [tutorError, setTutorError] = useState<string | null>(null);
   const [tutorLoading, setTutorLoading] = useState(false);
-  const [token, setToken] = useState("");
   const confettiTriggered = useRef(false);
   const restoredProgress = useRef(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
@@ -397,7 +395,6 @@ export function VerseSession() {
         whole: extra.whole ?? false,
         verseParses: formatVerseParses(verseData.words),
         signal: cards.map(signalText).join("\n\n"),
-        turnstileToken: token,
       });
       setTutorReply(result.reply);
     } catch (error) {
@@ -661,11 +658,6 @@ export function VerseSession() {
                     </button>
                   )}
                 </div>
-                {approved && (
-                  <div className="ml-auto">
-                    <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
-                  </div>
-                )}
               </div>
             </div>
 
@@ -678,7 +670,7 @@ export function VerseSession() {
                     <button
                       type="button"
                       className="btn w-fit"
-                      disabled={tutorLoading || (Boolean(turnstileSiteKey) && !token)}
+                      disabled={tutorLoading}
                       onClick={explainFurther}
                     >
                       {tutorLoading ? "Asking…" : "Explain further"}
@@ -707,7 +699,7 @@ export function VerseSession() {
                     <button
                       type="button"
                       className="btn text-sm"
-                      disabled={tutorLoading || (Boolean(turnstileSiteKey) && !token)}
+                      disabled={tutorLoading}
                       onClick={explainWhole}
                     >
                       {tutorLoading ? "Asking…" : "Explain the full parse"}

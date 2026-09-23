@@ -112,7 +112,7 @@ Tutor calls go through the `AI` binding and an [AI Gateway](https://developers.c
 
 `AI_MODEL` picks the model. A Workers AI id such as `@cf/meta/llama-3.3-70b-instruct-fp8-fast` is billed in Neurons on the account. An Anthropic id such as `anthropic/claude-sonnet-5` or `anthropic/claude-opus-5` uses the same binding and needs [Unified Billing](https://developers.cloudflare.com/ai-gateway/features/unified-billing/) credits loaded on the gateway. Changing `AI_MODEL` and redeploying is the whole switch. Guests and pending accounts cannot call it. Approved accounts share a monthly cap of 20,000 tokens.
 
-Turnstile is optional. Set `TURNSTILE_SITE_KEY` in `vars`, then:
+Turnstile is optional and guards only the sign-in flow (sending the magic link and confirming it). Tutor calls skip it: an approved, signed-in account is already vetted and token-capped. Set `TURNSTILE_SITE_KEY` in `vars`, then:
 
 ```bash
 npx wrangler secret put TURNSTILE_SECRET

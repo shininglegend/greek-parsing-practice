@@ -208,10 +208,8 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
             : "AI explanations are turned off for this account.";
       return json({ error: block, message }, { status: 403, cookies: session.cookies });
     }
+    // Signed-in, approved accounts are already vetted and token-capped; no Turnstile here.
     const body = asRecord(await readJson(request));
-    if (!(await verifyTurnstile(request, env, body?.turnstileToken))) {
-      return json({ error: "turnstile", message: "The check failed. Try again." }, { status: 400, cookies: session.cookies });
-    }
     const kind = path === "/api/explain" ? "explain" : "translation";
     const prompt = body
       ? kind === "explain"

@@ -6,7 +6,6 @@ import { ApiError, askTutor, getTranslations, type EnglishVersions } from "../st
 import type { Verse, Word } from "../types";
 import { splitTutorNote } from "../tutorNote";
 import { FIELD_SPECS, normalizeMissing } from "../utils";
-import { TurnstileField } from "./TurnstileField";
 
 function TutorWait() {
   const [progress, setProgress] = useState(6);
@@ -155,13 +154,12 @@ export function TranslateStep({
   showCompare: boolean;
   onShowCompare: (show: boolean) => void;
 }) {
-  const { user, turnstileSiteKey } = useSession();
+  const { user } = useSession();
   const [versions, setVersions] = useState<EnglishVersions | null>(null);
   const [versionError, setVersionError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [noteLoading, setNoteLoading] = useState(false);
-  const [token, setToken] = useState("");
   const chosenIds = useMemo(() => new Set(translateWordIds), [translateWordIds]);
   const canSelect = useFinePointer();
   const chosen = canSelect
@@ -231,7 +229,6 @@ export function TranslateStep({
             return `${name}: ${versions[key] ?? "unavailable"}`;
           })
           .join("\n"),
-        turnstileToken: token,
       });
       setNote(result.reply);
     } catch (error) {
@@ -312,11 +309,6 @@ export function TranslateStep({
           <button type="button" className="btn" onClick={() => onShowCompare(true)}>
             Compare
           </button>
-          {approved && (
-            <div className="ml-auto">
-              <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
-            </div>
-          )}
         </div>
       </div>
 
@@ -336,10 +328,7 @@ export function TranslateStep({
                 type="button"
                 className="btn"
                 disabled={
-                  noteLoading ||
-                  !english.trim() ||
-                  chosen.length === 0 ||
-                  (Boolean(turnstileSiteKey) && !token)
+                  noteLoading || !english.trim() || chosen.length === 0
                 }
                 onClick={requestNote}
               >
