@@ -8,7 +8,7 @@ const RIGHT = "what you got right";
 
 function bodyAfter(text: string): string {
   return text
-    .replace(/^[:\s#*\-]+/, "")
+    .replace(/^[:\s#*-]+/, "")
     .replace(/\s*#+\s*$/, "")
     .trim();
 }

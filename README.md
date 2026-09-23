@@ -29,6 +29,17 @@ That applies `migrations/` to a local D1 database under `.wrangler/` and serves 
 
 Workers AI still calls Cloudflare's remote models during local dev and can spend tokens. Leave the tutor alone unless you mean to.
 
+Checks before a commit:
+
+```bash
+npm run lint       # Biome lint + format check
+npm run lint:fix   # apply safe fixes and format
+npm run typecheck  # tsc -b across app, worker, and config
+npm test
+```
+
+Biome handles both linting and formatting. TypeScript 7 dropped the JavaScript compiler API, so typescript-eslint cannot run against this project. Hook dependency, array-index key, `any`, and most a11y rules report as warnings for now, so they show up without blocking a commit.
+
 ## Put it on Cloudflare
 
 Log in once:

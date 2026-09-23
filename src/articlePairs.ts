@@ -96,7 +96,10 @@ export function verseSegments(words: Word[], pairs: ArticlePair[]): VerseSegment
   return segments;
 }
 
-export function agreementFill(word: Word, words: Word[]): Pick<ParseFields, "case" | "number" | "gender"> | undefined {
+export function agreementFill(
+  word: Word,
+  words: Word[]
+): Pick<ParseFields, "case" | "number" | "gender"> | undefined {
   const pair = articlePairs(words).find((item) => item.articleId === word.id);
   if (!pair) return undefined;
   const parsed = word.parse;
@@ -111,7 +114,9 @@ export function plainSurface(surface: string): string {
 const NOMINAL = ["case", "number", "gender"] as const;
 
 export function nominalFeatures(word: Word): string {
-  return NOMINAL.map((field) => word.parse?.[field]).filter(Boolean).join(" ");
+  return NOMINAL.map((field) => word.parse?.[field])
+    .filter(Boolean)
+    .join(" ");
 }
 
 /** Case, number, and gender of the head are known only after the student has parsed them. */
@@ -123,7 +128,11 @@ export function headNominalKnown(head: Word, answer: Partial<ParseFields> | unde
   });
 }
 
-export function explainAgreement(article: Word, head: Word, revealFeatures: boolean): SignalExplanation {
+export function explainAgreement(
+  article: Word,
+  head: Word,
+  revealFeatures: boolean
+): SignalExplanation {
   const headSurface = plainSurface(head.surface);
   const features = nominalFeatures(article);
   return {

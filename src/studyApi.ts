@@ -86,9 +86,7 @@ export function getWeakSpots() {
 }
 
 export function getTranslations(ref: string) {
-  return request<{ versions: EnglishVersions }>(
-    `/api/translations?ref=${encodeURIComponent(ref)}`
-  );
+  return request<{ versions: EnglishVersions }>(`/api/translations?ref=${encodeURIComponent(ref)}`);
 }
 
 export function askTutor(
@@ -128,10 +126,7 @@ export function getAdminUsers() {
   return request<{ users: AdminUser[] }>("/api/admin/users");
 }
 
-export function updateAdminUser(
-  id: string,
-  patch: { status?: string; tokenCap?: number }
-) {
+export function updateAdminUser(id: string, patch: { status?: string; tokenCap?: number }) {
   return request<{ user: SessionUser | null }>(`/api/admin/users/${encodeURIComponent(id)}`, {
     method: "POST",
     body: JSON.stringify(patch),
@@ -139,7 +134,5 @@ export function updateAdminUser(
 }
 
 export function getAdminLogs(id: string) {
-  return request<{ logs: AiLogRow[] }>(
-    `/api/admin/users/${encodeURIComponent(id)}/logs`
-  );
+  return request<{ logs: AiLogRow[] }>(`/api/admin/users/${encodeURIComponent(id)}/logs`);
 }

@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import { NT_BOOKS } from "../utils";
 import type { Word } from "../types";
+import { NT_BOOKS } from "../utils";
 
 function isPositiveInteger(value: string): boolean {
   return /^[1-9]\d*$/.test(value.trim());
@@ -21,7 +21,7 @@ interface VerseSelectorProps {
   words?: Word[];
   selectedWordIds?: Set<string>;
   onWordToggle?: (wordId: string) => void;
-  onNavigate?: (direction: 'prev' | 'next') => void;
+  onNavigate?: (direction: "prev" | "next") => void;
   lexiconLoaded?: boolean;
   onLoadLexicon?: () => void;
   loadingLexicon?: boolean;
@@ -47,12 +47,12 @@ export function VerseSelector({
   lexiconLoaded,
   onLoadLexicon,
   loadingLexicon,
-  hideSurface
+  hideSurface,
 }: VerseSelectorProps) {
   const hasWords = words && words.length > 0;
   const showWordSelection = hasWords && onWordToggle && selectedWordIds;
-  
-  const currentVerse = parseInt(verse) || 1;
+
+  const currentVerse = parseInt(verse, 10) || 1;
   const canGoBack = currentVerse > 1;
   const focusedValue = useRef({ chapter, verse });
 
@@ -79,7 +79,7 @@ export function VerseSelector({
     (longest, book) => (book.name.length > longest.length ? book.name : longest),
     ""
   );
-  
+
   return (
     <div className="card mx-auto w-fit max-w-full flex flex-col gap-3">
       <div className="flex gap-2 flex-wrap">
@@ -94,10 +94,12 @@ export function VerseSelector({
           <select
             className="select col-start-1 row-start-1 w-full min-w-0"
             value={selectedBook}
-            onChange={e => onBookChange(e.target.value)}
+            onChange={(e) => onBookChange(e.target.value)}
           >
-            {NT_BOOKS.map(b => (
-              <option key={b.abbrev} value={b.abbrev}>{b.name}</option>
+            {NT_BOOKS.map((b) => (
+              <option key={b.abbrev} value={b.abbrev}>
+                {b.name}
+              </option>
             ))}
           </select>
         </div>
@@ -106,7 +108,7 @@ export function VerseSelector({
           type="number"
           min="1"
           value={chapter}
-          onChange={e => onChapterChange(e.target.value)}
+          onChange={(e) => onChapterChange(e.target.value)}
           onFocus={onFieldFocus}
           onBlur={commitFields}
           onKeyDown={onFieldKeyDown}
@@ -118,27 +120,31 @@ export function VerseSelector({
           type="number"
           min="1"
           value={verse}
-          onChange={e => onVerseChange(e.target.value)}
+          onChange={(e) => onVerseChange(e.target.value)}
           onFocus={onFieldFocus}
           onBlur={commitFields}
           onKeyDown={onFieldKeyDown}
           placeholder="Vs"
         />
-        <button className="btn" onClick={onLoad}>Load</button>
-        
+        <button type="button" className="btn" onClick={onLoad}>
+          Load
+        </button>
+
         {onNavigate && (
           <>
-            <button 
+            <button
+              type="button"
               className="btn"
-              onClick={() => onNavigate('prev')}
+              onClick={() => onNavigate("prev")}
               disabled={!canGoBack || loading}
               title="Previous verse"
             >
               ← Back
             </button>
-            <button 
+            <button
+              type="button"
               className="btn"
-              onClick={() => onNavigate('next')}
+              onClick={() => onNavigate("next")}
               disabled={loading}
               title="Next verse"
             >
@@ -147,9 +153,10 @@ export function VerseSelector({
           </>
         )}
       </div>
-      
+
       {onLoadLexicon && hasWords && !lexiconLoaded && (
-        <button 
+        <button
+          type="button"
           className="btn"
           onClick={onLoadLexicon}
           disabled={loadingLexicon || loading}
@@ -157,13 +164,13 @@ export function VerseSelector({
           {loadingLexicon ? "Loading definitions..." : "Load Lexicon Definitions"}
         </button>
       )}
-      
+
       {lexiconLoaded && (
         <div className="text-sm text-green-700">
           ✓ Lexicon loaded - hover over lemmas for brief definitions, click for full
         </div>
       )}
-      
+
       {!hideVerse && showWordSelection && (
         <>
           <div className="flex items-center justify-between">
@@ -171,14 +178,24 @@ export function VerseSelector({
               Click words to select/deselect for parsing:
             </div>
             <div className="flex gap-2">
-              <button 
-                onClick={() => words.forEach(w => !selectedWordIds.has(w.id) && onWordToggle(w.id))}
+              <button
+                type="button"
+                onClick={() =>
+                  words.forEach((w) => {
+                    if (!selectedWordIds.has(w.id)) onWordToggle(w.id);
+                  })
+                }
                 className="text-xs px-2 py-1 rounded-sm border border-slate-300 hover:bg-slate-50"
               >
                 Select All
               </button>
-              <button 
-                onClick={() => words.forEach(w => selectedWordIds.has(w.id) && onWordToggle(w.id))}
+              <button
+                type="button"
+                onClick={() =>
+                  words.forEach((w) => {
+                    if (selectedWordIds.has(w.id)) onWordToggle(w.id);
+                  })
+                }
                 className="text-xs px-2 py-1 rounded-sm border border-slate-300 hover:bg-slate-50"
               >
                 Clear All
@@ -190,11 +207,12 @@ export function VerseSelector({
               const isSelected = selectedWordIds.has(w.id);
               return (
                 <button
+                  type="button"
                   key={w.id}
                   onClick={() => onWordToggle(w.id)}
                   className={`px-2 py-1 rounded-md transition-colors cursor-pointer border-2 ${
-                    isSelected 
-                      ? "bg-blue-100 border-blue-500 text-blue-900 font-semibold" 
+                    isSelected
+                      ? "bg-blue-100 border-blue-500 text-blue-900 font-semibold"
                       : "bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100"
                   }`}
                   title={`${w.surface} (${w.lemma || "unknown"})`}
@@ -209,13 +227,13 @@ export function VerseSelector({
           </div>
         </>
       )}
-      
+
       {!hideVerse && !hideSurface && !showWordSelection && (
         <div className="text-base text-slate-700">
           <span className="font-mono text-lg">{surfaceLine}</span>
         </div>
       )}
-      
+
       {loading && <div className="text-sm">Loading…</div>}
       {error && <div className="text-sm text-red-700">Error: {error}</div>}
     </div>

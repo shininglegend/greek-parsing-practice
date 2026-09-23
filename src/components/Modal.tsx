@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -29,14 +29,14 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
       onClose();
     };
 
-    dialog.addEventListener('close', handleClose);
-    return () => dialog.removeEventListener('close', handleClose);
+    dialog.addEventListener("close", handleClose);
+    return () => dialog.removeEventListener("close", handleClose);
   }, [onClose]);
 
   if (!isOpen) return null;
 
   return (
-    <dialog 
+    <dialog
       ref={dialogRef}
       className="rounded-lg shadow-xl p-0 max-w-4xl w-full max-h-[90vh] backdrop:bg-black/50"
       onClick={(e) => {
@@ -50,6 +50,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
           <h2 className="text-xl font-bold">{title}</h2>
           <button
+            type="button"
             onClick={onClose}
             className="text-slate-500 hover:text-slate-700 text-2xl leading-none px-2"
             aria-label="Close"
@@ -57,9 +58,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             ×
           </button>
         </div>
-        <div className="p-3 overflow-y-auto">
-          {children}
-        </div>
+        <div className="p-3 overflow-y-auto">{children}</div>
       </div>
     </dialog>
   );

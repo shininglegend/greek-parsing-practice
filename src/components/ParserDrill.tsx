@@ -1,15 +1,9 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { loadVerse } from "../api";
-import { formatRef, scoreParse, celebrateWithConfetti } from "../utils";
 import { prefetchLemmas } from "../lexicon";
-import {
-  Footer,
-  Header,
-  Results,
-  VerseSelector,
-  WordCard,
-} from "./";
 import type { DrillAnswer, Verse } from "../types";
+import { celebrateWithConfetti, formatRef, scoreParse } from "../utils";
+import { Footer, Header, Results, VerseSelector, WordCard } from "./";
 
 type State =
   | { kind: "idle" }
@@ -23,9 +17,7 @@ export function ParserDrill() {
   const [verse, setVerse] = useState("1");
   const [state, setState] = useState<State>({ kind: "idle" });
   const [answers, setAnswers] = useState<Record<string, DrillAnswer>>({});
-  const [selectedWordIds, setSelectedWordIds] = useState<Set<string>>(
-    new Set()
-  );
+  const [selectedWordIds, setSelectedWordIds] = useState<Set<string>>(new Set());
   const [lexiconLoaded, setLexiconLoaded] = useState(false);
   const [loadingLexicon, setLoadingLexicon] = useState(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
@@ -45,13 +37,13 @@ export function ParserDrill() {
     }
   }
 
-  async function handleNavigate(direction: 'prev' | 'next') {
-    const currentVerse = parseInt(verse);
-    if (isNaN(currentVerse)) return;
-    
-    const newVerse = direction === 'prev' ? currentVerse - 1 : currentVerse + 1;
+  async function handleNavigate(direction: "prev" | "next") {
+    const currentVerse = parseInt(verse, 10);
+    if (Number.isNaN(currentVerse)) return;
+
+    const newVerse = direction === "prev" ? currentVerse - 1 : currentVerse + 1;
     if (newVerse < 1) return;
-    
+
     setVerse(newVerse.toString());
     const formatted = formatRef(selectedBook, chapter, newVerse.toString());
     setState({ kind: "loading", ref: formatted });
@@ -94,32 +86,32 @@ export function ParserDrill() {
 
   async function loadLexiconForCurrentVerse() {
     if (!verseData || lexiconLoaded || loadingLexicon) return;
-    
+
     setLoadingLexicon(true);
     try {
-      const lemmas = verseData.words.map(w => w.lemma).filter(Boolean) as string[];
+      const lemmas = verseData.words.map((w) => w.lemma).filter(Boolean) as string[];
       const lexiconMap = await prefetchLemmas(lemmas);
-      
+
       // Update verse data with definitions
       const updatedVerse = {
         ...verseData,
-        words: verseData.words.map(w => {
+        words: verseData.words.map((w) => {
           if (w.lemma) {
             const entry = lexiconMap.get(w.lemma);
             if (entry) {
               return {
                 ...w,
                 definition: {
-                  brief: entry.definitions.find(d => d.role === "brief")?.text,
-                  full: entry.definitions.find(d => d.role === "full")?.text,
-                }
+                  brief: entry.definitions.find((d) => d.role === "brief")?.text,
+                  full: entry.definitions.find((d) => d.role === "full")?.text,
+                },
               };
             }
           }
           return w;
-        })
+        }),
       };
-      
+
       setState({ kind: "loaded", verse: updatedVerse });
       setLexiconLoaded(true);
     } catch (e: any) {
@@ -130,8 +122,7 @@ export function ParserDrill() {
   }
 
   // Filter words to only show selected ones
-  const wordsToShow =
-    verseData?.words.filter((w) => selectedWordIds.has(w.id)) ?? [];
+  const wordsToShow = verseData?.words.filter((w) => selectedWordIds.has(w.id)) ?? [];
 
   // Track if confetti has been triggered for this verse
   const confettiTriggered = useRef(false);
@@ -173,44 +164,36 @@ export function ParserDrill() {
       <Header />
       <div className="mx-auto max-w-5xl p-4 space-y-4">
         <VerseSelector
-        selectedBook={selectedBook}
-        chapter={chapter}
-        verse={verse}
-        onBookChange={setSelectedBook}
-        onChapterChange={setChapter}
-        onVerseChange={setVerse}
-        onLoad={load}
-        surfaceLine={surfaceLine}
-        loading={state.kind === "loading"}
-        error={state.kind === "error" ? state.msg : undefined}
-        words={verseData?.words}
-        selectedWordIds={selectedWordIds}
-        onWordToggle={toggleWord}
-        onNavigate={handleNavigate}
-        lexiconLoaded={lexiconLoaded}
-        onLoadLexicon={loadLexiconForCurrentVerse}
-        loadingLexicon={loadingLexicon}
-      />
+          selectedBook={selectedBook}
+          chapter={chapter}
+          verse={verse}
+          onBookChange={setSelectedBook}
+          onChapterChange={setChapter}
+          onVerseChange={setVerse}
+          onLoad={load}
+          surfaceLine={surfaceLine}
+          loading={state.kind === "loading"}
+          error={state.kind === "error" ? state.msg : undefined}
+          words={verseData?.words}
+          selectedWordIds={selectedWordIds}
+          onWordToggle={toggleWord}
+          onNavigate={handleNavigate}
+          lexiconLoaded={lexiconLoaded}
+          onLoadLexicon={loadLexiconForCurrentVerse}
+          loadingLexicon={loadingLexicon}
+        />
 
-      {verseData && wordsToShow.length > 0 && (
-        <>
-          <div className="grid gap-3 md:grid-cols-2">
-            {wordsToShow.map((w) => (
-              <WordCard
-                key={w.id}
-                w={w}
-                answer={answers[w.id]}
-                onChange={setAnswer}
-              />
-            ))}
-          </div>
-          <Results
-            verse={{ ...verseData, words: wordsToShow }}
-            answers={answers}
-          />
-          <Footer />
-        </>
-      )}
+        {verseData && wordsToShow.length > 0 && (
+          <>
+            <div className="grid gap-3 md:grid-cols-2">
+              {wordsToShow.map((w) => (
+                <WordCard key={w.id} w={w} answer={answers[w.id]} onChange={setAnswer} />
+              ))}
+            </div>
+            <Results verse={{ ...verseData, words: wordsToShow }} answers={answers} />
+            <Footer />
+          </>
+        )}
       </div>
     </>
   );

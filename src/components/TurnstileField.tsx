@@ -48,9 +48,7 @@ export function TurnstileField({
     if (window.turnstile) {
       render();
     } else {
-      const existing = document.querySelector<HTMLScriptElement>(
-        "script[data-turnstile]"
-      );
+      const existing = document.querySelector<HTMLScriptElement>("script[data-turnstile]");
       if (existing) {
         existing.addEventListener("load", render);
       } else {

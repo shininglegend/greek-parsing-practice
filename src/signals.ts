@@ -1,5 +1,5 @@
 import { GRAMMAR_DEFINITIONS } from "./data/grammarDefinitions";
-import { MORPHOLOGY_CHARTS } from "./data/morphologyCharts";
+import type { MORPHOLOGY_CHARTS } from "./data/morphologyCharts";
 import type { ParseFields } from "./types";
 
 export type ChartKey = keyof typeof MORPHOLOGY_CHARTS;
@@ -162,7 +162,7 @@ export function findCue(
   words: { surface: string }[],
   parse: ParseFields | undefined
 ): Cue | undefined {
-  if (!parse || parse.mood !== "subjunctive") return undefined;
+  if (parse?.mood !== "subjunctive") return undefined;
   for (const cue of SUBJUNCTIVE_CUES) {
     if (cue.when && !cue.when(parse)) continue;
     const hit = words.some((word) => foldGreek(word.surface) === cue.folded);
@@ -171,11 +171,7 @@ export function findCue(
   return undefined;
 }
 
-export function englishFor(
-  field: string,
-  gold: string,
-  cue?: Cue
-): string {
+export function englishFor(field: string, gold: string, cue?: Cue): string {
   if (field === "mood" && gold === "subjunctive" && cue) return cue.note;
   return ENGLISH_CONSEQUENCE[field]?.[gold] ?? `This value is ${gold}.`;
 }
@@ -211,7 +207,13 @@ function chartFor(
     }
   }
   const tense = field === "tense" ? gold : parse?.tense;
-  if (pos === "verb" || field === "tense" || field === "mood" || field === "voice" || field === "person") {
+  if (
+    pos === "verb" ||
+    field === "tense" ||
+    field === "mood" ||
+    field === "voice" ||
+    field === "person"
+  ) {
     if (tense === "imperfect") return { key: "imperfectActive", label: "Imperfect active" };
     if (tense === "future") return { key: "futureActive", label: "Future active" };
     if (tense === "aorist") return { key: "aoristActive", label: "Aorist active" };
@@ -253,13 +255,19 @@ function pairEvidence(
     );
   }
 
-  if (field === "voice" && (gold === "middle" || gold === "passive" || guess === "middle" || guess === "passive")) {
+  if (
+    field === "voice" &&
+    (gold === "middle" || gold === "passive" || guess === "middle" || guess === "passive")
+  ) {
     lines.push(
       "In the present, imperfect, and perfect, middle and passive endings often look the same. The difference is what the subject is doing."
     );
   }
 
-  if (field === "case" && ((guess === "genitive" && gold === "dative") || (guess === "dative" && gold === "genitive"))) {
+  if (
+    field === "case" &&
+    ((guess === "genitive" && gold === "dative") || (guess === "dative" && gold === "genitive"))
+  ) {
     lines.push(
       "Genitive singular often ends in -ου, -ς, or -ος. Dative singular often ends in -ι or -ῳ (an iota)."
     );
@@ -277,7 +285,10 @@ function pairEvidence(
     );
   }
 
-  if (parse?.mood === "participle" && (field === "case" || field === "gender" || field === "number")) {
+  if (
+    parse?.mood === "participle" &&
+    (field === "case" || field === "gender" || field === "number")
+  ) {
     lines.push("This is a participle, so it agrees like an adjective: case, number, and gender.");
   }
 
@@ -334,13 +345,12 @@ export function explainCorrect(input: {
   verseWords: { surface: string }[];
 }): SignalExplanation {
   const note = explainMiss({ ...input, guess: input.gold });
-  const evidence = note.evidence.filter(
-    (line) => !line.startsWith("Compare this form with the")
-  );
+  const evidence = note.evidence.filter((line) => !line.startsWith("Compare this form with the"));
   return {
     ...note,
     contrast: `This form is ${input.gold}.`,
-    evidence: evidence.length > 0 ? evidence : ["The form and the clause around it are the signal."],
+    evidence:
+      evidence.length > 0 ? evidence : ["The form and the clause around it are the signal."],
   };
 }
 

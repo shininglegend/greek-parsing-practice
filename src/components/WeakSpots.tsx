@@ -32,7 +32,8 @@ export function WeakSpots() {
       <div className="mx-auto max-w-lg p-4 space-y-3">
         <h2 className="text-xl font-bold">Weak spots</h2>
         <p className="text-sm text-slate-600">
-          Counts of graded fields on this browser’s account. Open a verse that contains a recent miss.
+          Counts of graded fields on this browser’s account. Open a verse that contains a recent
+          miss.
         </p>
         {error && <p className="text-sm text-red-700">{error}</p>}
         {spots && spots.length === 0 && (
@@ -48,7 +49,10 @@ export function WeakSpots() {
                 Missed {spot.misses} of {spot.total}
               </p>
               {spot.verseRef && (
-                <Link className="text-sm text-blue-700 underline min-h-11 inline-flex items-center" to={`/?ref=${encodeURIComponent(spot.verseRef)}`}>
+                <Link
+                  className="text-sm text-blue-700 underline min-h-11 inline-flex items-center"
+                  to={`/?ref=${encodeURIComponent(spot.verseRef)}`}
+                >
                   Open {spot.verseRef}
                 </Link>
               )}

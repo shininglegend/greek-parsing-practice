@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSession } from "../session";
 import {
+  type AdminUser,
+  type AiLogRow,
   getAdminLogs,
   getAdminUsers,
   updateAdminUser,
-  type AdminUser,
-  type AiLogRow,
 } from "../studyApi";
 import { Footer, Header } from "./";
 
@@ -77,25 +77,37 @@ function AdminList() {
                 <div className="font-semibold">{account.email}</div>
                 <div className="text-sm text-slate-600">
                   {account.status}
-                  {account.role === "admin" ? " · admin" : ""} · joined {account.created_at.slice(0, 10)}
+                  {account.role === "admin" ? " · admin" : ""} · joined{" "}
+                  {account.created_at.slice(0, 10)}
                 </div>
               </div>
-              <Link className="text-sm text-blue-700 underline min-h-11 inline-flex items-center" to={`/admin/${account.id}`}>
+              <Link
+                className="text-sm text-blue-700 underline min-h-11 inline-flex items-center"
+                to={`/admin/${account.id}`}
+              >
                 Tutor log
               </Link>
             </div>
             <p className="text-sm">
-              This month: {account.calls} calls, {account.input_tokens} in, {account.output_tokens} out.
-              Cap {account.token_cap}.
+              This month: {account.calls} calls, {account.input_tokens} in, {account.output_tokens}{" "}
+              out. Cap {account.token_cap}.
             </p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="btn" onClick={() => setStatus(account.id, "approved")}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setStatus(account.id, "approved")}
+              >
                 Approve
               </button>
               <button type="button" className="btn" onClick={() => setStatus(account.id, "denied")}>
                 Revoke
               </button>
-              <button type="button" className="btn" onClick={() => setStatus(account.id, "pending")}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setStatus(account.id, "pending")}
+              >
                 Mark pending
               </button>
             </div>
@@ -159,7 +171,8 @@ function AdminLogs({ userId }: { userId: string }) {
         {logs?.map((row) => (
           <li key={row.id} className="card space-y-2 text-sm">
             <div className="text-slate-600">
-              {row.created_at} · {row.kind} · {row.cache_hit ? "cache" : `${row.input_tokens} in / ${row.output_tokens} out`}
+              {row.created_at} · {row.kind} ·{" "}
+              {row.cache_hit ? "cache" : `${row.input_tokens} in / ${row.output_tokens} out`}
             </div>
             <div>
               <div className="font-semibold">Query</div>

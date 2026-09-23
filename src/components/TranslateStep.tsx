@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { articlePairs, verseSegments } from "../articlePairs";
 import { buildChecklist } from "../checklist";
 import { useSession } from "../session";
-import { ApiError, askTutor, getTranslations, type EnglishVersions } from "../studyApi";
-import type { Verse, Word } from "../types";
+import { ApiError, askTutor, type EnglishVersions, getTranslations } from "../studyApi";
 import { splitTutorNote } from "../tutorNote";
+import type { Verse, Word } from "../types";
 import { FIELD_SPECS, normalizeMissing } from "../utils";
 
 function TutorWait() {
@@ -29,7 +29,9 @@ function TutorWait() {
       >
         <div className="h-full rounded-full bg-slate-900" style={{ width: `${progress}%` }} />
       </div>
-      <p className="text-sm text-slate-600">Working through the parse. This often takes a minute.</p>
+      <p className="text-sm text-slate-600">
+        Working through the parse. This often takes a minute.
+      </p>
     </div>
   );
 }
@@ -98,9 +100,7 @@ function TranslateWord({
     <button
       type="button"
       className={`group relative rounded-md px-0.5 text-left ${
-        !selectable || chosen
-          ? "text-slate-900"
-          : "text-slate-400"
+        !selectable || chosen ? "text-slate-900" : "text-slate-400"
       } ${selectable && chosen ? "underline decoration-slate-800 decoration-2 underline-offset-4" : ""}`}
       aria-expanded={open}
       aria-pressed={selectable ? chosen : undefined}
@@ -162,9 +162,7 @@ export function TranslateStep({
   const [noteLoading, setNoteLoading] = useState(false);
   const chosenIds = useMemo(() => new Set(translateWordIds), [translateWordIds]);
   const canSelect = useFinePointer();
-  const chosen = canSelect
-    ? verse.words.filter((word) => chosenIds.has(word.id))
-    : verse.words;
+  const chosen = canSelect ? verse.words.filter((word) => chosenIds.has(word.id)) : verse.words;
   const checklist = buildChecklist(verse.words).filter((line) =>
     chosen.some((word) => word.id === line.wordId)
   );
@@ -202,7 +200,9 @@ export function TranslateStep({
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setVersionError(error instanceof Error ? error.message : "Could not load English versions.");
+          setVersionError(
+            error instanceof Error ? error.message : "Could not load English versions."
+          );
         }
       });
     return () => {
@@ -221,7 +221,8 @@ export function TranslateStep({
         greek: verse.words.map((word) => word.surface).join(" "),
         translating,
         english,
-        checklist: checklist.map((line) => line.text).join("\n") ||
+        checklist:
+          checklist.map((line) => line.text).join("\n") ||
           "No parse is recorded for the words the student chose.",
         versions: ["WEB", "KJV", "ASV"]
           .map((name) => {
@@ -250,45 +251,49 @@ export function TranslateStep({
           </p>
         </div>
         {canSelect && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span>
-            {chosen.length} of {verse.words.length} words
-          </span>
-          <button
-            type="button"
-            className="underline"
-            onClick={() => {
-              onTranslateWordIds(verse.words.map((word) => word.id));
-              setNote(null);
-            }}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className="underline"
-            onClick={() => {
-              onTranslateWordIds([]);
-              setNote(null);
-            }}
-          >
-            None
-          </button>
-        </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span>
+              {chosen.length} of {verse.words.length} words
+            </span>
+            <button
+              type="button"
+              className="underline"
+              onClick={() => {
+                onTranslateWordIds(verse.words.map((word) => word.id));
+                setNote(null);
+              }}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className="underline"
+              onClick={() => {
+                onTranslateWordIds([]);
+                setNote(null);
+              }}
+            >
+              None
+            </button>
+          </div>
         )}
         <div ref={wordRowRef} className="flex flex-wrap items-baseline gap-x-3 gap-y-3">
           {verseSegments(verse.words, articlePairs(verse.words)).map((segment) => {
-            const tokens = (segment.kind === "pair" ? segment.words : [segment.word]).map((word) => (
-              <TranslateWord
-                key={word.id}
-                word={word}
-                open={openWordId === word.id}
-                chosen={chosenIds.has(word.id)}
-                selectable={canSelect}
-                onChoose={() => toggleChosen(word.id)}
-                onToggle={() => setOpenWordId((current) => (current === word.id ? null : word.id))}
-              />
-            ));
+            const tokens = (segment.kind === "pair" ? segment.words : [segment.word]).map(
+              (word) => (
+                <TranslateWord
+                  key={word.id}
+                  word={word}
+                  open={openWordId === word.id}
+                  chosen={chosenIds.has(word.id)}
+                  selectable={canSelect}
+                  onChoose={() => toggleChosen(word.id)}
+                  onToggle={() =>
+                    setOpenWordId((current) => (current === word.id ? null : word.id))
+                  }
+                />
+              )
+            );
             if (segment.kind === "pair") {
               return (
                 <div key={segment.pair.articleId} className="flex gap-x-3">
@@ -327,9 +332,7 @@ export function TranslateStep({
               <button
                 type="button"
                 className="btn"
-                disabled={
-                  noteLoading || !english.trim() || chosen.length === 0
-                }
+                disabled={noteLoading || !english.trim() || chosen.length === 0}
                 onClick={requestNote}
               >
                 {noteLoading ? "Asking…" : "Ask about my English and the parse"}
@@ -360,7 +363,9 @@ export function TranslateStep({
             {chosen.length === 0 ? (
               <p className="text-sm text-slate-600">Select at least one word to translate.</p>
             ) : checklist.length === 0 ? (
-              <p className="text-sm text-slate-600">No parse is recorded for the words you chose.</p>
+              <p className="text-sm text-slate-600">
+                No parse is recorded for the words you chose.
+              </p>
             ) : (
               <ul className="text-sm space-y-1">
                 {checklist.map((line) => (

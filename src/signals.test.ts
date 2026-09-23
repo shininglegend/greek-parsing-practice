@@ -20,25 +20,32 @@ describe("explainMiss", () => {
       field: "mood",
       guess: "indicative",
       gold: "subjunctive",
-      parse: { pos: "verb", tense: "present", voice: "active", mood: "subjunctive", person: "first", number: "plural" },
+      parse: {
+        pos: "verb",
+        tense: "present",
+        voice: "active",
+        mood: "subjunctive",
+        person: "first",
+        number: "plural",
+      },
       verseWords: verse,
     });
     expect(note.cue).toBe("ἵνα");
     expect(note.contrast).toContain("indicative");
     expect(note.english).toContain("so that");
     expect(note.evidence.some((line) => line.includes("ἵνα"))).toBe(true);
-    expect(note.evidence.some((line) => line.includes("This form shows that lengthened vowel."))).toBe(true);
+    expect(
+      note.evidence.some((line) => line.includes("This form shows that lengthened vowel."))
+    ).toBe(true);
     expect(note.chartKey).toBe("presentActive");
   });
 
   it("does not treat μή as a cue unless the subjunctive is aorist", () => {
     const words = [{ surface: "μὴ" }, { surface: "λέγῃ" }];
-    expect(
-      findCue(words, { pos: "verb", mood: "subjunctive", tense: "present" })
-    ).toBeUndefined();
-    expect(
-      findCue(words, { pos: "verb", mood: "subjunctive", tense: "aorist" })?.display
-    ).toBe("μή");
+    expect(findCue(words, { pos: "verb", mood: "subjunctive", tense: "present" })).toBeUndefined();
+    expect(findCue(words, { pos: "verb", mood: "subjunctive", tense: "aorist" })?.display).toBe(
+      "μή"
+    );
   });
 
   it("flags an irregular lemma instead of forcing an ending", () => {
@@ -52,7 +59,9 @@ describe("explainMiss", () => {
       verseWords: [{ surface: "ἦν" }],
     });
     expect(note.irregular).toBe(true);
-    expect(note.evidence.some((line) => line.includes("This form shows that lengthened vowel."))).toBe(false);
+    expect(
+      note.evidence.some((line) => line.includes("This form shows that lengthened vowel."))
+    ).toBe(false);
     expect(note.evidence.some((line) => line.includes("irregular"))).toBe(true);
   });
 });
@@ -81,7 +90,9 @@ describe("buildChecklist", () => {
     ];
     const lines = buildChecklist(words).map((line) => line.text);
     expect(lines.some((line) => line.includes("θεοῦ, genitive") && line.includes("of"))).toBe(true);
-    expect(lines.some((line) => line.includes("λέγωμεν, subjunctive") && line.includes("so that"))).toBe(true);
+    expect(
+      lines.some((line) => line.includes("λέγωμεν, subjunctive") && line.includes("so that"))
+    ).toBe(true);
   });
 });
 

@@ -18,7 +18,7 @@ export function MorphologyCharts({ initialChart = "article" }: { initialChart?: 
     { key: "futureActive", label: "Future Active" },
     { key: "aoristActive", label: "Aorist Active" },
     { key: "perfectActive", label: "Perfect Active" },
-    { key: "middlePassive", label: "Middle/Passive" }
+    { key: "middlePassive", label: "Middle/Passive" },
   ];
 
   const currentChart = MORPHOLOGY_CHARTS[activeChart as keyof typeof MORPHOLOGY_CHARTS];
@@ -27,9 +27,10 @@ export function MorphologyCharts({ initialChart = "article" }: { initialChart?: 
     <div className="flex flex-col sm:flex-row gap-3">
       <nav className="sm:w-36 sm:shrink-0">
         <ul className="flex sm:flex-col gap-1 overflow-x-auto">
-          {charts.map(chart => (
+          {charts.map((chart) => (
             <li key={chart.key}>
               <button
+                type="button"
                 onClick={() => setActiveChart(chart.key)}
                 className={`w-full text-left px-2 py-2 rounded-sm text-sm transition-colors ${
                   activeChart === chart.key
@@ -74,7 +75,9 @@ export function MorphologyCharts({ initialChart = "article" }: { initialChart?: 
                           <td
                             key={cIdx}
                             className={`border border-slate-300 px-2 py-2 ${
-                              cIdx === 0 ? "font-medium text-slate-700" : "text-slate-800 font-greek"
+                              cIdx === 0
+                                ? "font-medium text-slate-700"
+                                : "text-slate-800 font-greek"
                             }`}
                           >
                             {cell}

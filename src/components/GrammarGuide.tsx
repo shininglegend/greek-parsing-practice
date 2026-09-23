@@ -12,7 +12,7 @@ export function GrammarGuide() {
     { key: "tense", label: "Tenses" },
     { key: "voice", label: "Voices" },
     { key: "mood", label: "Moods" },
-    { key: "person", label: "Person" }
+    { key: "person", label: "Person" },
   ];
 
   const currentSection = GRAMMAR_DEFINITIONS[activeSection as keyof typeof GRAMMAR_DEFINITIONS];
@@ -22,9 +22,10 @@ export function GrammarGuide() {
       {/* Sidebar navigation */}
       <nav className="w-32 shrink-0">
         <ul className="space-y-1">
-          {sections.map(section => (
+          {sections.map((section) => (
             <li key={section.key}>
               <button
+                type="button"
                 onClick={() => setActiveSection(section.key)}
                 className={`w-full text-left px-3 py-2 rounded-sm transition-colors ${
                   activeSection === section.key

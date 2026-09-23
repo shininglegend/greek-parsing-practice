@@ -40,14 +40,12 @@ export const GRAMMAR_DEFINITIONS = {
       },
       {
         term: "Conjunction",
-        definition:
-          "A word that connects words, phrases, or clauses. Conjunctions are invariable.",
+        definition: "A word that connects words, phrases, or clauses. Conjunctions are invariable.",
         example: "καί (kai) - and, also, even",
       },
       {
         term: "Particle",
-        definition:
-          "A small, indeclinable word that adds nuance or emphasis to a sentence.",
+        definition: "A small, indeclinable word that adds nuance or emphasis to a sentence.",
         example: "ἄν (an) - a particle indicating contingency",
       },
       {
@@ -249,8 +247,7 @@ export const GRAMMAR_DEFINITIONS = {
       },
       {
         term: "Second Person",
-        definition:
-          "The person(s) being addressed. 'You' (singular or plural).",
+        definition: "The person(s) being addressed. 'You' (singular or plural).",
         example: "λέγεις - you say; λέγετε - you (all) say",
       },
       {

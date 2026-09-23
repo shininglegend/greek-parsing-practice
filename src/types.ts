@@ -10,18 +10,19 @@ export type ParseFields = {
 };
 
 export type Word = {
-  surface: string;     // e.g., "Ἐν"
-  lemma?: string;      // e.g., "ἐν"
+  surface: string; // e.g., "Ἐν"
+  lemma?: string; // e.g., "ἐν"
   parse?: ParseFields; // normalized fields
-  id: string;          // stable key
-  definition?: {       // optional lexicon data
+  id: string; // stable key
+  definition?: {
+    // optional lexicon data
     brief?: string;
     full?: string;
   };
 };
 
 export type Verse = {
-  ref: string;         // "Jn 1:1"
+  ref: string; // "Jn 1:1"
   words: Word[];
 };
 

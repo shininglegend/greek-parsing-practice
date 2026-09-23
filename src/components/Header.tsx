@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useSession } from "../session";
 import { ApiError, logout, sendMagicLink } from "../studyApi";
@@ -121,13 +121,34 @@ export function Header() {
             <Link to="/weak-spots" className={linkClass} onClick={closeMenu}>
               Weak spots
             </Link>
-            <button type="button" className={`${linkClass} text-left`} onClick={() => { closeMenu(); setShowHelp(true); }}>
+            <button
+              type="button"
+              className={`${linkClass} text-left`}
+              onClick={() => {
+                closeMenu();
+                setShowHelp(true);
+              }}
+            >
               Help
             </button>
-            <button type="button" className={`${linkClass} text-left`} onClick={() => { closeMenu(); setShowMorphologyCharts(true); }}>
+            <button
+              type="button"
+              className={`${linkClass} text-left`}
+              onClick={() => {
+                closeMenu();
+                setShowMorphologyCharts(true);
+              }}
+            >
               Morphology charts
             </button>
-            <button type="button" className={`${linkClass} text-left`} onClick={() => { closeMenu(); setShowGrammarGuide(true); }}>
+            <button
+              type="button"
+              className={`${linkClass} text-left`}
+              onClick={() => {
+                closeMenu();
+                setShowGrammarGuide(true);
+              }}
+            >
               Grammar guide
             </button>
             {user?.role === "admin" && (

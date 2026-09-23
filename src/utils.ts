@@ -2,60 +2,94 @@ import confetti from "canvas-confetti";
 import type { FieldSpec, ParseFields } from "./types";
 
 export const FIELD_SPECS: FieldSpec[] = [
-  { key: "pos",    label: "Part of Speech", options: ["noun","verb","adjective","adverb","preposition","pronoun","conjunction","particle","article"] },
-  { key: "case",   label: "Case",           options: ["nominative","genitive","dative","accusative","vocative","—"] },
-  { key: "number", label: "Number",         options: ["singular","plural","—"] },
-  { key: "gender", label: "Gender",         options: ["masculine","feminine","neuter","—"] },
-  { key: "tense",  label: "Tense",          options: ["present","imperfect","future","aorist","perfect","pluperfect","—"] },
-  { key: "voice",  label: "Voice",          options: ["active","middle","passive","middle/passive","—"] },
-  { key: "mood",   label: "Mood",           options: ["indicative","imperative","subjunctive","optative","infinitive","participle","—"] },
-  { key: "person", label: "Person",         options: ["first","second","third","—"] },
+  {
+    key: "pos",
+    label: "Part of Speech",
+    options: [
+      "noun",
+      "verb",
+      "adjective",
+      "adverb",
+      "preposition",
+      "pronoun",
+      "conjunction",
+      "particle",
+      "article",
+    ],
+  },
+  {
+    key: "case",
+    label: "Case",
+    options: ["nominative", "genitive", "dative", "accusative", "vocative", "—"],
+  },
+  { key: "number", label: "Number", options: ["singular", "plural", "—"] },
+  { key: "gender", label: "Gender", options: ["masculine", "feminine", "neuter", "—"] },
+  {
+    key: "tense",
+    label: "Tense",
+    options: ["present", "imperfect", "future", "aorist", "perfect", "pluperfect", "—"],
+  },
+  { key: "voice", label: "Voice", options: ["active", "middle", "passive", "middle/passive", "—"] },
+  {
+    key: "mood",
+    label: "Mood",
+    options: [
+      "indicative",
+      "imperative",
+      "subjunctive",
+      "optative",
+      "infinitive",
+      "participle",
+      "—",
+    ],
+  },
+  { key: "person", label: "Person", options: ["first", "second", "third", "—"] },
 ];
 
 // Map short forms (from API) to long forms (for display/comparison)
 const VALUE_NORMALIZATION: Record<string, string> = {
   // Part of speech
-  'adj': 'adjective',
-  'adv': 'adverb',
-  'prep': 'preposition',
-  'pron': 'pronoun',
-  'conj': 'conjunction',
-  'part': 'particle',
+  adj: "adjective",
+  adv: "adverb",
+  prep: "preposition",
+  pron: "pronoun",
+  conj: "conjunction",
+  part: "particle",
   // Case
-  'nom': 'nominative',
-  'gen': 'genitive',
-  'dat': 'dative',
-  'acc': 'accusative',
-  'voc': 'vocative',
+  nom: "nominative",
+  gen: "genitive",
+  dat: "dative",
+  acc: "accusative",
+  voc: "vocative",
   // Number
-  'sg': 'singular',
-  'pl': 'plural',
+  sg: "singular",
+  pl: "plural",
   // Gender
-  'masc': 'masculine',
-  'fem': 'feminine',
-  'neut': 'neuter',
+  masc: "masculine",
+  fem: "feminine",
+  neut: "neuter",
   // Tense
-  'pres': 'present',
-  'impf': 'imperfect',
-  'fut': 'future',
-  'aor': 'aorist',
-  'perf': 'perfect',
-  'plup': 'pluperfect',
+  pres: "present",
+  impf: "imperfect",
+  fut: "future",
+  aor: "aorist",
+  perf: "perfect",
+  plup: "pluperfect",
   // Voice
-  'act': 'active',
-  'mid': 'middle',
-  'pass': 'passive',
-  'mp': 'middle/passive',
+  act: "active",
+  mid: "middle",
+  pass: "passive",
+  mp: "middle/passive",
   // Mood
-  'ind': 'indicative',
-  'impv': 'imperative',
-  'subj': 'subjunctive',
-  'opt': 'optative',
-  'inf': 'infinitive',
+  ind: "indicative",
+  impv: "imperative",
+  subj: "subjunctive",
+  opt: "optative",
+  inf: "infinitive",
   // Person
-  '1': 'first',
-  '2': 'second',
-  '3': 'third',
+  "1": "first",
+  "2": "second",
+  "3": "third",
 };
 
 export function normalizeMissing(v?: string): string | undefined {
@@ -66,13 +100,11 @@ export function normalizeMissing(v?: string): string | undefined {
   return VALUE_NORMALIZATION[s] || s;
 }
 
-export function scoreParse(
-  gold: ParseFields | undefined,
-  guess: Partial<ParseFields>
-) {
-  let total = 0, correct = 0;
+export function scoreParse(gold: ParseFields | undefined, guess: Partial<ParseFields>) {
+  let total = 0,
+    correct = 0;
   const details: { key: keyof ParseFields; ok: boolean; gold?: string; guess?: string }[] = [];
-  FIELD_SPECS.forEach(f => {
+  FIELD_SPECS.forEach((f) => {
     const g = normalizeMissing(gold?.[f.key]);
     const u = normalizeMissing(guess[f.key]);
     if (g === undefined) return; // field not provided → ignore
@@ -112,7 +144,7 @@ export const NT_BOOKS = [
   { name: "2 John", abbrev: "2Jn" },
   { name: "3 John", abbrev: "3Jn" },
   { name: "Jude", abbrev: "Jude" },
-  { name: "Revelation", abbrev: "Rev" }
+  { name: "Revelation", abbrev: "Rev" },
 ];
 
 // Books with only one chapter (need to hardcode chapter 1)
@@ -122,12 +154,12 @@ export function formatRef(book: string, chapter: string, verse: string): string 
   const bookAbbrev = book.trim();
   let chap = chapter.trim();
   const v = verse.trim();
-  
+
   // For single-chapter books, force chapter to be "1"
   if (SINGLE_CHAPTER_BOOKS.includes(bookAbbrev)) {
     chap = "1";
   }
-  
+
   return `${bookAbbrev} ${chap}:${v}`;
 }
 
@@ -147,23 +179,23 @@ export const RELEVANT_FIELDS: Record<string, FieldKey[]> = {
 };
 
 export function isFieldRelevant(
-  pos: string | undefined, 
+  pos: string | undefined,
   field: FieldKey,
   parseFields?: ParseFields
 ): boolean {
   if (!pos) return true; // Show all fields if no POS selected
   const normalized = normalizeMissing(pos);
   if (!normalized) return true;
-  
+
   // Get base relevant fields for this POS
   const relevantFields = RELEVANT_FIELDS[normalized];
   if (!relevantFields) return true; // Unknown POS, show all
-  
+
   // Additional context-sensitive rules based on other parse fields
   // Check these BEFORE the base field check to handle special cases
   if (parseFields) {
     const mood = normalizeMissing(parseFields.mood);
-    
+
     // Verbs: participles and infinitives have special rules
     if (normalized === "verb") {
       // Infinitives: no person, no number (they're not inflected for these)
@@ -177,28 +209,28 @@ export function isFieldRelevant(
         if (field === "case" || field === "gender") return true;
       }
     }
-    
+
     // Particles: only POS is relevant (no inflection)
     if (normalized === "particle") {
       return false; // No fields beyond POS
     }
-    
+
     // Adverbs, prepositions, conjunctions: only POS
     if (["adverb", "preposition", "conjunction"].includes(normalized)) {
       return false;
     }
   }
-  
+
   // Base check: is this field in the relevant list?
   if (!relevantFields.includes(field)) return false;
-  
+
   return true;
 }
 
 // Trigger confetti celebration
 export function celebrateWithConfetti() {
   const particleCount = 200;
-  
+
   // From the left
   confetti({
     particleCount,
@@ -209,7 +241,7 @@ export function celebrateWithConfetti() {
     ticks: 350,
     zIndex: 2000,
   });
-  
+
   // From the right
   confetti({
     particleCount,
@@ -220,7 +252,7 @@ export function celebrateWithConfetti() {
     ticks: 350,
     zIndex: 2000,
   });
-  
+
   // From the top
   confetti({
     particleCount: particleCount * 1.5,

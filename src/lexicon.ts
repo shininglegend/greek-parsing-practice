@@ -20,7 +20,8 @@ type LetterData = {
 // Cache fetched letter files to avoid redundant requests
 const cache = new Map<string, LexiconEntry[]>();
 
-const BASE_URL = "https://raw.githubusercontent.com/shininglegend/Dodson-Greek-Lexicon/refs/heads/master/split-json";
+const BASE_URL =
+  "https://raw.githubusercontent.com/shininglegend/Dodson-Greek-Lexicon/refs/heads/master/split-json";
 
 /**
  * Fetch lexicon data for a specific Greek letter
@@ -50,14 +51,14 @@ async function fetchLetterData(letter: string): Promise<LexiconEntry[]> {
  */
 function getFirstLetter(word: string): string {
   if (!word) return "";
-  
+
   // Normalize to NFD (decomposed form) to separate base letter from diacritics
   const normalized = word[0].normalize("NFD");
-  
+
   // Remove diacritical marks (accents, breathing marks, etc.)
   // Unicode ranges: combining diacritical marks
   const baseLetter = normalized.replace(/[\u0300-\u036f]/g, "");
-  
+
   return baseLetter.toLowerCase();
 }
 
@@ -75,25 +76,25 @@ export async function lookupLemma(lemma: string): Promise<LexiconEntry | undefin
   // 1. Try exact match on the base orth (before comma)
   // 2. Try exact match on full orth
   // 3. Try prefix match only if lemma is longer than 2 characters (to avoid ὁ matching ὁμείρομαι)
-  
+
   // First: exact match on base form (most common case)
-  let entry = entries.find(e => {
+  let entry = entries.find((e) => {
     const orth = e.orth.split(",")[0].trim();
     return orth === lemma;
   });
-  
+
   if (entry) return entry;
-  
+
   // Second: exact match on full orth (handles cases like "ὁ, ἡ, τό")
-  entry = entries.find(e => e.orth === lemma);
-  
+  entry = entries.find((e) => e.orth === lemma);
+
   if (entry) return entry;
-  
+
   // Third: prefix match only for longer words (3+ chars) to avoid false matches
   if (lemma.length >= 3) {
-    entry = entries.find(e => e.orth.startsWith(lemma));
+    entry = entries.find((e) => e.orth.startsWith(lemma));
   }
-  
+
   // If still not found, return undefined (word may not be in lexicon)
   return entry;
 }
@@ -103,7 +104,7 @@ export async function lookupLemma(lemma: string): Promise<LexiconEntry | undefin
  */
 export async function getBriefDefinition(lemma: string): Promise<string | undefined> {
   const entry = await lookupLemma(lemma);
-  return entry?.definitions.find(d => d.role === "brief")?.text;
+  return entry?.definitions.find((d) => d.role === "brief")?.text;
 }
 
 /**
@@ -111,7 +112,7 @@ export async function getBriefDefinition(lemma: string): Promise<string | undefi
  */
 export async function getFullDefinition(lemma: string): Promise<string | undefined> {
   const entry = await lookupLemma(lemma);
-  return entry?.definitions.find(d => d.role === "full")?.text;
+  return entry?.definitions.find((d) => d.role === "full")?.text;
 }
 
 /**
@@ -120,10 +121,10 @@ export async function getFullDefinition(lemma: string): Promise<string | undefin
  */
 export async function prefetchLemmas(lemmas: string[]): Promise<Map<string, LexiconEntry>> {
   const uniqueLetters = new Set(lemmas.map(getFirstLetter).filter(Boolean));
-  
+
   // Fetch all unique letters in parallel
   await Promise.all(Array.from(uniqueLetters).map(fetchLetterData));
-  
+
   // Build map of lemma -> entry
   const result = new Map<string, LexiconEntry>();
   for (const lemma of lemmas) {
@@ -132,6 +133,6 @@ export async function prefetchLemmas(lemmas: string[]): Promise<Map<string, Lexi
       result.set(lemma, entry);
     }
   }
-  
+
   return result;
 }

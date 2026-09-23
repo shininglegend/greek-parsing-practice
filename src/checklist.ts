@@ -21,10 +21,7 @@ export type ChecklistLine = {
 
 /** What the gold parse commits the English to. Not a grade of the user's sentence. */
 export function buildChecklist(words: Word[]): ChecklistLine[] {
-  const cue = findCue(
-    words,
-    words.find((word) => word.parse?.mood === "subjunctive")?.parse
-  );
+  const cue = findCue(words, words.find((word) => word.parse?.mood === "subjunctive")?.parse);
   const pairs = articlePairs(words);
   const lines: ChecklistLine[] = [];
   for (const word of words) {
@@ -32,7 +29,9 @@ export function buildChecklist(words: Word[]): ChecklistLine[] {
     const pair = pairs.find((item) => item.articleId === word.id);
     if (pair && word.parse.pos === "article") {
       const head = words.find((item) => item.id === pair.headId);
-      const features = [word.parse.case, word.parse.number, word.parse.gender].filter(Boolean).join(" ");
+      const features = [word.parse.case, word.parse.number, word.parse.gender]
+        .filter(Boolean)
+        .join(" ");
       lines.push({
         wordId: word.id,
         surface: word.surface,

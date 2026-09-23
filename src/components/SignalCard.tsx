@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import type { SignalExplanation } from "../signals";
 import { Modal } from "./Modal";
 import { MorphologyCharts } from "./MorphologyCharts";

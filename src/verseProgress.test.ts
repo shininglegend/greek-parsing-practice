@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { progressForVerse, readProgress, writeProgress, type VerseProgress } from "./verseProgress";
+import { progressForVerse, readProgress, type VerseProgress, writeProgress } from "./verseProgress";
 
 function memory(): Storage {
   const values = new Map<string, string>();
@@ -53,7 +53,10 @@ describe("verse progress", () => {
   });
 
   it("keeps an explicit empty selection", () => {
-    const progress = progressForVerse({ ...saved, selectedWordIds: [], translateWordIds: [] }, ["a", "b"]);
+    const progress = progressForVerse({ ...saved, selectedWordIds: [], translateWordIds: [] }, [
+      "a",
+      "b",
+    ]);
     expect(progress.selectedWordIds).toEqual([]);
     expect(progress.translateWordIds).toEqual([]);
     expect(progress.activeId).toBeNull();

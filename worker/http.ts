@@ -1,7 +1,4 @@
-export function json(
-  data: unknown,
-  init: { status?: number; cookies?: string[] } = {}
-): Response {
+export function json(data: unknown, init: { status?: number; cookies?: string[] } = {}): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
   });
@@ -44,13 +41,8 @@ export function clearSessionCookie(request: Request): string {
 }
 
 export async function sha256(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value)
-  );
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export async function readJson(request: Request): Promise<unknown> {
