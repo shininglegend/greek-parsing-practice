@@ -4,34 +4,39 @@ import {
   ensureSession,
   isAdminEmail,
   logout,
+  magicLinkEmail,
   monthStartIso,
   publicUser,
   sendMagicLink,
+  signedInDocument,
+  signInConfirmPage,
   type UserRow,
 } from "./session";
 import { englishVersions } from "./translations";
 import { aiBlock, explainPrompt, runTutor, translationPrompt } from "./tutor";
 
-const FIELDS = new Set([
-  "pos",
-  "case",
-  "number",
-  "gender",
-  "tense",
-  "voice",
-  "mood",
-  "person",
-]);
+const FIELDS = new Set(["pos", "case", "number", "gender", "tense", "voice", "mood", "person"]);
 
 async function requireAdmin(request: Request, env: Env) {
   const session = await ensureSession(request, env);
   if (session.user.role !== "admin" && !isAdminEmail(env, session.user.email ?? "")) {
-    return { session, denied: json({ error: "forbidden", message: "Admin only." }, { status: 403, cookies: session.cookies }) };
+    return {
+      session,
+      denied: json(
+        { error: "forbidden", message: "Admin only." },
+        { status: 403, cookies: session.cookies }
+      ),
+    };
   }
   return { session, denied: null };
 }
 
-async function verifyTurnstile(request: Request, env: Env, token: unknown): Promise<boolean> {
+async function verifyTurnstile(
+  request: Request,
+  env: Env,
+  token: unknown,
+  check?: { action: string; hostname: string }
+): Promise<boolean> {
   const secret = env.TURNSTILE_SECRET;
   if (!secret) return true;
   if (typeof token !== "string" || !token) return false;
@@ -44,8 +49,10 @@ async function verifyTurnstile(request: Request, env: Env, token: unknown): Prom
     method: "POST",
     body,
   });
-  const data = (await response.json()) as { success?: boolean };
-  return data.success === true;
+  const data = (await response.json()) as { success?: boolean; action?: string; hostname?: string };
+  if (data.success !== true) return false;
+  if (check && (data.action !== check.action || data.hostname !== check.hostname)) return false;
+  return true;
 }
 
 async function route(request: Request, env: Env, url: URL): Promise<Response> {
@@ -84,13 +91,57 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     }
   }
 
-  if (path === "/api/auth/verify" && request.method === "GET") {
-    const token = url.searchParams.get("token") ?? "";
-    const cookie = token ? await consumeMagicLink(request, env, token) : null;
-    const next = new URL(cookie ? "/" : "/?auth=invalid", request.url);
-    const headers = new Headers({ location: next.href });
-    if (cookie) headers.append("Set-Cookie", cookie);
-    return new Response(null, { status: 302, headers });
+  if (path === "/api/auth/verify" && request.method === "HEAD") {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
+  }
+
+  if (path === "/api/auth/verify" && (request.method === "GET" || request.method === "POST")) {
+    const home = new URL("/", request.url);
+    const invalid = new URL("/?auth=invalid", request.url);
+    const siteKey = (env.TURNSTILE_SITE_KEY as string) || "";
+    const action = new URL("/api/auth/verify", request.url).href;
+    const pageHeaders = {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+    };
+    const form = request.method === "POST" ? await request.formData() : null;
+    const token = form ? String(form.get("token") ?? "") : (url.searchParams.get("token") ?? "");
+    const email = token ? await magicLinkEmail(env, token) : null;
+    if (!email) {
+      return new Response(null, { status: 303, headers: { location: invalid.href } });
+    }
+    if (form) {
+      const turnstileOk = await verifyTurnstile(request, env, form.get("cf-turnstile-response"), {
+        action: "signin",
+        hostname: url.hostname,
+      });
+      if (!turnstileOk) {
+        return new Response(
+          signInConfirmPage(action, token, email, siteKey, "The check failed. Try again."),
+          { headers: pageHeaders }
+        );
+      }
+      const cookie = await consumeMagicLink(request, env, token);
+      if (!cookie) {
+        return new Response(null, { status: 303, headers: { location: invalid.href } });
+      }
+      const headers = new Headers({
+        location: home.href,
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        refresh: `0;url=${home.href}`,
+      });
+      headers.append("Set-Cookie", cookie);
+      return new Response(signedInDocument(home.href), { status: 303, headers });
+    }
+    return new Response(signInConfirmPage(action, token, email, siteKey), { headers: pageHeaders });
   }
 
   if (path === "/api/auth/logout" && request.method === "POST") {
@@ -107,7 +158,10 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     const gold = asString(body?.gold, 40);
     const guess = asString(body?.guess, 40);
     if (!verseRef || !wordId || !field || !gold || !guess || !FIELDS.has(field)) {
-      return json({ error: "attempt", message: "Incomplete attempt." }, { status: 400, cookies: session.cookies });
+      return json(
+        { error: "attempt", message: "Incomplete attempt." },
+        { status: 400, cookies: session.cookies }
+      );
     }
     const id = crypto.randomUUID();
     const cue = asString(body?.cue, 40);
@@ -137,10 +191,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     )
       .bind(session.user.id, field, gold, cue ?? "", id)
       .first<{ n: number }>();
-    return json(
-      { priorMisses: Number(prior?.n ?? 0) },
-      { cookies: session.cookies }
-    );
+    return json({ priorMisses: Number(prior?.n ?? 0) }, { cookies: session.cookies });
   }
 
   if (path === "/api/weak-spots" && request.method === "GET") {
@@ -193,10 +244,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     }
   }
 
-  if (
-    (path === "/api/explain" || path === "/api/translation-note") &&
-    request.method === "POST"
-  ) {
+  if ((path === "/api/explain" || path === "/api/translation-note") && request.method === "POST") {
     const session = await ensureSession(request, env);
     const block = aiBlock(session.user);
     if (block) {
@@ -217,7 +265,10 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
         : translationPrompt(body)
       : null;
     if (!prompt) {
-      return json({ error: "prompt", message: "The tutor request was incomplete." }, { status: 400, cookies: session.cookies });
+      return json(
+        { error: "prompt", message: "The tutor request was incomplete." },
+        { status: 400, cookies: session.cookies }
+      );
     }
     const result = await runTutor(env, session.user, kind, prompt);
     if ("error" in result) {
@@ -268,7 +319,10 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
       const status = asString(body?.status, 20);
       const tokenCap = body?.tokenCap;
       if (status && !["pending", "approved", "denied"].includes(status)) {
-        return json({ error: "status", message: "Unknown status." }, { status: 400, cookies: session.cookies });
+        return json(
+          { error: "status", message: "Unknown status." },
+          { status: 400, cookies: session.cookies }
+        );
       }
       if (status) {
         await env.DB.prepare("UPDATE users SET status = ? WHERE id = ? AND status != 'guest'")
