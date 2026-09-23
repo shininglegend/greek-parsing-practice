@@ -26,8 +26,11 @@ describe("explainPrompt", () => {
     expect(prompt).toContain("ending, paradigm, agreement");
     expect(prompt).toContain("If your guessed parse would spell the same Greek surface");
     expect(prompt).toContain("If your guessed parse would spell a different surface");
-    expect(prompt).toContain("Do not define the grammatical category");
-    expect(prompt).toContain("Do not repeat the signal card");
+    expect(prompt).toContain(
+      "For every grammatical label you use, such as indicative or infinitive, add a brief plain-English gloss"
+    );
+    expect(prompt).toContain("how the context of this verse informs the choice");
+    expect(prompt).toContain("Do not repeat the signal card word for word");
     expect(prompt).toContain("Do not say coincidence");
     expect(prompt).not.toContain("Explain this miss or this form.");
     expect(prompt).not.toContain("Clause:");
@@ -57,12 +60,40 @@ describe("translationPrompt", () => {
     const prompt = translationPrompt({
       verseRef: "Jn 1:1",
       greek: "Ἐν ἀρχῇ ἦν ὁ λόγος",
+      translating: "the whole verse",
       english: "In the beginning was the Word",
       checklist: "λόγος, nominative: subject",
       versions: "WEB: In the beginning was the Word.",
     });
-    expect(prompt).toContain("Say whether the student's English shows the checklist items.");
-    expect(prompt).toContain("what this parse commits the English to in the sentence");
+    expect(prompt).toContain("The student is translating the whole verse.");
+    expect(prompt).toContain("Under What you got wrong");
+    expect(prompt).toContain("Under What you got right");
+    expect(prompt).toContain("what the parse commits the sentence to");
+  });
+
+  it("limits the judgment to the words the student chose", () => {
+    const prompt = translationPrompt({
+      verseRef: "Jn 11:35",
+      greek: "ἐδάκρυσεν ὁ Ἰησοῦς",
+      translating: "ἐδάκρυσεν",
+      english: "wept",
+      checklist: "ἐδάκρυσεν, aorist: a single past action",
+      versions: "WEB: Jesus wept.",
+    });
+    expect(prompt).toContain("The student is translating only these words: ἐδάκρυσεν.");
+    expect(prompt).toContain("do not require the English to cover them");
+  });
+
+  it("rejects a note that does not say which words are being translated", () => {
+    expect(
+      translationPrompt({
+        verseRef: "Jn 1:1",
+        greek: "Ἐν ἀρχῇ ἦν ὁ λόγος",
+        english: "In the beginning was the Word",
+        checklist: "λόγος, nominative: subject",
+        versions: "WEB: In the beginning was the Word.",
+      })
+    ).toBeNull();
   });
 });
 
@@ -73,6 +104,28 @@ describe("tutorRequest", () => {
     expect(messages.map((message) => message.role)).toEqual(["system", "user"]);
     expect(messages[1]?.content).toBe(PROMPT);
     expect(body.system).toBeUndefined();
+  });
+
+  it("asks Kimi K2.5 for the answer without a reasoning trace", () => {
+    const body = tutorRequest("@cf/moonshotai/kimi-k2.5", PROMPT);
+    const messages = body.messages as { role: string; content: string }[];
+    expect(messages.map((message) => message.role)).toEqual(["system", "user"]);
+    expect(messages[1]?.content).toBe(PROMPT);
+    expect(body.max_tokens).toBe(1024);
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false, thinking: false });
+  });
+
+  it("lets a translation model think and leaves room for the paragraph", () => {
+    const body = tutorRequest("@cf/moonshotai/kimi-k2.6", PROMPT, true);
+    expect(body.max_tokens).toBe(8192);
+    expect(body.max_completion_tokens).toBe(8192);
+    expect(body.thinking).toEqual({ type: "enabled" });
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: true, thinking: true });
+    const messages = body.messages as { role: string; content: string }[];
+    expect(messages[0]?.content).toContain("What you got wrong");
+    expect(messages[0]?.content).toContain("What you got right");
+    expect(messages[0]?.content).not.toContain("one short paragraph");
   });
 
   it("sends Anthropic a system field and a user message", () => {
@@ -112,5 +165,52 @@ describe("readTutorResult", () => {
         usage: { prompt_tokens: 40, completion_tokens: 3 },
       })
     ).toEqual({ text: "Jesus wept.", input: 40, output: 3 });
+  });
+
+  it("reads a Kimi answer and leaves the reasoning trace out", () => {
+    expect(
+      readTutorResult({
+        choices: [
+          {
+            message: {
+              content: "This form is indicative.",
+              reasoning_content: "The ending is ουσι.",
+            },
+          },
+        ],
+        usage: { prompt_tokens: 50, completion_tokens: 30 },
+      })
+    ).toEqual({ text: "This form is indicative.", input: 50, output: 30 });
+  });
+
+  it("drops a reasoning trace wrapped in think tags", () => {
+    expect(
+      readTutorResult({
+        choices: [
+          {
+            message: {
+              content: "<think>The ending is ουσι.</think>This form is indicative.",
+            },
+          },
+        ],
+      })
+    ).toEqual({ text: "This form is indicative.", input: 0, output: 0 });
+  });
+
+  it("reads text parts inside a chat message and skips a thinking part", () => {
+    expect(
+      readTutorResult({
+        choices: [
+          {
+            message: {
+              content: [
+                { type: "thinking", thinking: "hidden" },
+                { type: "text", text: "The article agrees." },
+              ],
+            },
+          },
+        ],
+      })
+    ).toEqual({ text: "The article agrees.", input: 0, output: 0 });
   });
 });

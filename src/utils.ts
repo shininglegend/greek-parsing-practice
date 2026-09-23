@@ -206,7 +206,8 @@ export function celebrateWithConfetti() {
     spread: 55,
     origin: { x: 0, y: 0.6 },
     startVelocity: 55,
-    ticks: 350
+    ticks: 350,
+    zIndex: 2000,
   });
   
   // From the right
@@ -216,7 +217,8 @@ export function celebrateWithConfetti() {
     spread: 55,
     origin: { x: 1, y: 0.6 },
     startVelocity: 55,
-    ticks: 350
+    ticks: 350,
+    zIndex: 2000,
   });
   
   // From the top
@@ -226,6 +228,7 @@ export function celebrateWithConfetti() {
     origin: { x: 0.5, y: 1 },
     startVelocity: 65,
     gravity: 0.8,
-    ticks: 500
+    ticks: 500,
+    zIndex: 2000,
   });
 }

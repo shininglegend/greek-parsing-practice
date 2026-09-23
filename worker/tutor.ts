@@ -1,12 +1,23 @@
 import { asString, sha256 } from "./http";
 import { monthStartIso, type UserRow } from "./session";
 
-const SYSTEM = [
+const SYSTEM_BASE = [
   "You tutor Koine Greek for someone who has already been shown a signal card.",
   "The gold morphological parse is from MorphGNT and is correct.",
   "Do not offer a different parse, and do not treat any English version as the only right translation.",
   "Explain from the signal notes and the verse word parses. Address the student as you.",
-  "Be concise: one short paragraph.",
+];
+
+const SYSTEM = [...SYSTEM_BASE, "Be concise: one short paragraph."].join(" ");
+
+const TRANSLATION_SYSTEM = [
+  ...SYSTEM_BASE,
+  "Write exactly two sections, in this order.",
+  "Put each heading on its own line, spelled exactly:",
+  "What you got wrong",
+  "What you got right",
+  "Under each heading, write a few sentences.",
+  "If a section has nothing to say, write None under that heading.",
 ].join(" ");
 
 export function aiBlock(user: UserRow): "sign_in" | "pending" | "denied" | null {
@@ -43,9 +54,10 @@ export function explainPrompt(body: Record<string, unknown>): string | null {
         "then explain the cue from another word in the verse (agreement) using the verse parses.",
         "If your guessed parse would spell a different surface, name that Greek form once",
         "and contrast it with the actual surface.",
-        "Do not define the grammatical category, and do not say what it means in English",
-        "or as a sentence role (subject, possession, origin, who/what).",
-        "Do not repeat the signal card. Do not ramble. Do not say coincidence.",
+        "For every grammatical label you use, such as indicative or infinitive, add a brief plain-English gloss of what it means.",
+        "Then say how the context of this verse informs the choice:",
+        "agreement, the word's job in the sentence, or another cue from the verse parses.",
+        "Do not repeat the signal card word for word. Do not ramble. Do not say coincidence.",
         "Do not change the gold parse.",
       ].join(" ");
   return [
@@ -65,24 +77,32 @@ export function translationPrompt(body: Record<string, unknown>): string | null 
   const english = asString(body.english, 2000);
   const checklist = asString(body.checklist, 4000);
   const versions = asString(body.versions, 4000);
-  if (!verseRef || !greek || !english || !checklist || !versions) return null;
+  const translating = asString(body.translating, 1000);
+  if (!verseRef || !greek || !english || !checklist || !versions || !translating) return null;
+  const scope =
+    translating === "the whole verse"
+      ? "The student is translating the whole verse."
+      : `The student is translating only these words: ${translating}. Judge the English against those words and the checklist. The other Greek words are context; do not require the English to cover them.`;
   return [
     `Verse: ${verseRef}`,
     `Greek: ${greek}`,
+    `Translating: ${translating}`,
     `Student English: ${english}`,
     `Parse checklist:\n${checklist}`,
     `Public-domain versions:\n${versions}`,
     [
-      "Say whether the student's English shows the checklist items.",
-      "Also explain briefly what this parse commits the English to in the sentence",
-      "(subject, object, ongoing action, and similar)—that contextual meaning belongs here,",
-      "not on the morphology step.",
-      "Do not grade it as wrong against one version. Note where the versions themselves differ.",
+      scope,
+      "Under What you got wrong, name the checklist items the English misses",
+      "and what the parse commits the sentence to (subject, object, ongoing action, and similar).",
+      "Under What you got right, name the checklist items the English already shows.",
+      "Do not grade the English as wrong against one version. Note where the versions themselves differ.",
     ].join(" "),
   ].join("\n");
 }
 
 const PARAGRAPH_TOKENS = 1024;
+// Room for a reasoning trace plus the finished paragraph.
+const TRANSLATION_TOKENS = 8192;
 
 type Usage = {
   prompt_tokens?: number;
@@ -91,22 +111,50 @@ type Usage = {
   output_tokens?: number;
 };
 
-export function tutorRequest(model: string, prompt: string): Record<string, unknown> {
+export function tutorRequest(
+  model: string,
+  prompt: string,
+  think = false
+): Record<string, unknown> {
+  const system = think ? TRANSLATION_SYSTEM : SYSTEM;
   // Anthropic Messages puts the system prompt beside the messages and requires max_tokens.
   if (model.startsWith("anthropic/")) {
     return {
-      max_tokens: PARAGRAPH_TOKENS,
-      system: SYSTEM,
+      max_tokens: think ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS,
+      system,
       messages: [{ role: "user", content: prompt }],
     };
   }
-  return {
-    max_tokens: PARAGRAPH_TOKENS,
-    messages: [
-      { role: "system", content: SYSTEM },
-      { role: "user", content: prompt },
-    ],
-  };
+  const messages = [
+    { role: "system", content: system },
+    { role: "user", content: prompt },
+  ];
+  const tokens = think ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS;
+  if (model.includes("kimi-")) {
+    return {
+      max_tokens: tokens,
+      max_completion_tokens: tokens,
+      thinking: { type: think ? "enabled" : "disabled" },
+      chat_template_kwargs: think
+        ? { enable_thinking: true, thinking: true }
+        : { enable_thinking: false, thinking: false },
+      messages,
+    };
+  }
+  return { max_tokens: tokens, messages };
+}
+
+function partsText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((block) => {
+      if (!block || typeof block !== "object") return "";
+      const item = block as { type?: string; text?: string };
+      if (item.type && item.type !== "text") return "";
+      return item.text ?? "";
+    })
+    .join("");
 }
 
 function textFrom(value: unknown): string {
@@ -118,34 +166,34 @@ function textFrom(value: unknown): string {
     content?: unknown;
     choices?: unknown;
   };
-  if (typeof record.response === "string") return record.response;
-  if (typeof record.result === "string") return record.result;
-  if (Array.isArray(record.content)) {
-    return record.content
-      .map((block) => {
-        if (!block || typeof block !== "object") return "";
-        const item = block as { type?: string; text?: string };
-        if (item.type && item.type !== "text") return "";
-        return item.text ?? "";
-      })
-      .join("");
-  }
   if (Array.isArray(record.choices)) {
     const first = record.choices[0] as
       | { text?: unknown; message?: { content?: unknown } }
       | undefined;
-    if (typeof first?.text === "string") return first.text;
-    if (typeof first?.message?.content === "string") return first.message.content;
+    const fromChoice =
+      typeof first?.text === "string" ? first.text : partsText(first?.message?.content);
+    if (fromChoice.trim()) return fromChoice;
   }
+  const fromParts = partsText(record.content);
+  if (fromParts.trim()) return fromParts;
+  if (typeof record.response === "string" && record.response.trim()) return record.response;
+  if (typeof record.result === "string") return record.result;
   return "";
 }
 
+function visibleAnswer(text: string): string {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think>[\s\S]*$/i, "")
+    .trim();
+}
+
 export function readTutorResult(result: unknown): { text: string; input: number; output: number } {
-  if (typeof result === "string") return { text: result.trim(), input: 0, output: 0 };
+  if (typeof result === "string") return { text: visibleAnswer(result), input: 0, output: 0 };
   if (!result || typeof result !== "object") return { text: "", input: 0, output: 0 };
   const usage = (result as { usage?: Usage }).usage;
   return {
-    text: textFrom(result).trim(),
+    text: visibleAnswer(textFrom(result)),
     input: usage?.prompt_tokens ?? usage?.input_tokens ?? 0,
     output: usage?.completion_tokens ?? usage?.output_tokens ?? 0,
   };
@@ -197,8 +245,9 @@ export async function runTutor(
   kind: "explain" | "translation",
   prompt: string
 ): Promise<{ reply: string } | { error: "cap" | "model"; message: string }> {
-  const model: string = env.AI_MODEL;
-  const cacheKey = `ai:${await sha256(`${model}\n${kind}\n${prompt}`)}`;
+  const model = kind === "translation" ? env.AI_TRANSLATION_MODEL : env.AI_MODEL;
+  // v2 drops replies cached while Kimi was still spending the token cap on a reasoning trace.
+  const cacheKey = `ai:${await sha256(`v2\n${model}\n${kind}\n${prompt}`)}`;
   const cached = await env.CACHE.get(cacheKey);
   if (cached) {
     await logCall(env, user.id, kind, prompt, cached, 0, 0, true);
@@ -215,7 +264,7 @@ export async function runTutor(
 
   let result: unknown;
   try {
-    result = await env.AI.run(model, tutorRequest(model, prompt), {
+    result = await env.AI.run(model, tutorRequest(model, prompt, kind === "translation"), {
       gateway: { id: env.AI_GATEWAY_ID || "default" },
     });
   } catch (error) {

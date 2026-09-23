@@ -9,6 +9,7 @@ export function Header() {
   const [params] = useSearchParams();
   const { user, turnstileSiteKey, refresh } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(params.get("auth") === "invalid");
   const [showGrammarGuide, setShowGrammarGuide] = useState(false);
   const [showMorphologyCharts, setShowMorphologyCharts] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -52,15 +53,63 @@ export function Header() {
           <Link to="/" className="text-lg font-bold" onClick={closeMenu}>
             Koine Parser
           </Link>
-          <button
-            type="button"
-            className="btn"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            Menu
-          </button>
+          <div className="flex items-center gap-2">
+            {user?.email ? (
+              <button type="button" className="btn" onClick={signOut}>
+                Sign out
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn"
+                aria-expanded={authOpen}
+                onClick={() => {
+                  setAuthOpen((open) => !open);
+                  setMenuOpen(false);
+                }}
+              >
+                Sign in
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn"
+              aria-expanded={menuOpen}
+              onClick={() => {
+                setMenuOpen((open) => !open);
+                setAuthOpen(false);
+              }}
+            >
+              Menu
+            </button>
+          </div>
         </div>
+        {authOpen && !user?.email && (
+          <div className="mx-auto max-w-5xl px-4 pb-4 border-t">
+            <form className="space-y-2 max-w-sm pt-3" onSubmit={submitEmail}>
+              <label className="block text-sm">
+                Email
+                <input
+                  className="input w-full mt-1"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                />
+              </label>
+              <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
+              <button
+                type="submit"
+                className="btn"
+                disabled={sending || (Boolean(turnstileSiteKey) && !token)}
+              >
+                {sending ? "Sending…" : "Email me a sign-in link"}
+              </button>
+              {authMessage && <p className="text-sm text-slate-700">{authMessage}</p>}
+            </form>
+          </div>
+        )}
         {menuOpen && (
           <nav className="mx-auto max-w-5xl px-4 pb-4 flex flex-col gap-1 border-t">
             <Link to="/" className={linkClass} onClick={closeMenu}>
@@ -100,29 +149,18 @@ export function Header() {
                   </button>
                 </>
               ) : (
-                <form className="space-y-2" onSubmit={submitEmail}>
-                  <label className="block text-sm">
-                    Email
-                    <input
-                      className="input w-full mt-1"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      autoComplete="email"
-                    />
-                  </label>
-                  <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
-                  <button
-                    type="submit"
-                    className="btn"
-                    disabled={sending || (Boolean(turnstileSiteKey) && !token)}
-                  >
-                    {sending ? "Sending…" : "Email me a sign-in link"}
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    closeMenu();
+                    setAuthOpen(true);
+                  }}
+                >
+                  Sign in
+                </button>
               )}
-              {authMessage && <p className="text-sm text-slate-700">{authMessage}</p>}
+              {authMessage && !authOpen && <p className="text-sm text-slate-700">{authMessage}</p>}
             </div>
           </nav>
         )}

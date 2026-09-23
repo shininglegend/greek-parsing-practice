@@ -3,7 +3,12 @@ import { useEffect, useRef } from "react";
 type TurnstileApi = {
   render: (
     element: HTMLElement,
-    options: { sitekey: string; callback: (token: string) => void }
+    options: {
+      sitekey: string;
+      callback: (token: string) => void;
+      "expired-callback": () => void;
+      "error-callback": () => void;
+    }
   ) => string;
   remove: (widgetId: string) => void;
 };
@@ -35,6 +40,8 @@ export function TurnstileField({
       widgetId = window.turnstile.render(host.current, {
         sitekey: siteKey,
         callback: (token) => onTokenRef.current(token),
+        "expired-callback": () => onTokenRef.current(""),
+        "error-callback": () => onTokenRef.current(""),
       });
     };
 
@@ -59,9 +66,10 @@ export function TurnstileField({
     return () => {
       cancelled = true;
       if (widgetId) window.turnstile?.remove(widgetId);
+      onTokenRef.current("");
     };
   }, [siteKey]);
 
   if (!siteKey) return null;
-  return <div ref={host} className="min-h-16" />;
+  return <div ref={host} className="min-h-16 shrink-0" />;
 }

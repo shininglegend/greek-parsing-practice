@@ -8,6 +8,7 @@ interface __BaseEnv_Env {
 	AI: Ai;
 	ASSETS: Fetcher;
 	AI_MODEL: "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+	AI_TRANSLATION_MODEL: "@cf/moonshotai/kimi-k2.6";
 	AI_GATEWAY_ID: "greekparser";
 	ADMIN_EMAILS: "";
 	EMAIL_FROM: "";
@@ -24,7 +25,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "AI_MODEL" | "AI_GATEWAY_ID" | "ADMIN_EMAILS" | "EMAIL_FROM" | "TURNSTILE_SITE_KEY">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "AI_MODEL" | "AI_TRANSLATION_MODEL" | "AI_GATEWAY_ID" | "ADMIN_EMAILS" | "EMAIL_FROM" | "TURNSTILE_SITE_KEY">> {}
 }
 
 // Begin runtime types

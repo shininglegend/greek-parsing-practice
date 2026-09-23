@@ -20,6 +20,7 @@ import { Footer, Header, Modal, VerseSelector } from "./";
 import { SignalCard } from "./SignalCard";
 import { TranslateStep } from "./TranslateStep";
 import { TurnstileField } from "./TurnstileField";
+import { progressForVerse, readProgress, writeProgress } from "../verseProgress";
 
 type LoadState =
   | { kind: "idle" }
@@ -97,26 +98,45 @@ function signalText(note: SignalExplanation) {
     .join("\n");
 }
 
+function wordParsed(word: Word, answer: DrillAnswer | undefined, pairedArticle: boolean): boolean {
+  const fields = visibleFields(word, answer, pairedArticle);
+  if (fields.length === 0) return false;
+  return fields.every((field) => {
+    const gold = normalizeMissing(word.parse?.[field.key]);
+    const guess = normalizeMissing(answer?.[field.key]);
+    return Boolean(gold && guess && gold === guess);
+  });
+}
+
 function WordButton({
   word,
   active,
   selected,
+  parsed,
   marked,
   onSelect,
 }: {
   word: Word;
   active: boolean;
   selected: boolean;
+  parsed: boolean;
   marked: boolean;
   onSelect: () => void;
 }) {
+  const tone = active
+    ? parsed
+      ? "bg-green-700 text-white"
+      : "bg-slate-900 text-white"
+    : parsed
+      ? "text-green-900"
+      : selected
+        ? "text-slate-900"
+        : "text-slate-400";
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`px-1 rounded-md ${
-        active ? "bg-slate-900 text-white" : selected ? "text-slate-900" : "text-slate-400"
-      } ${marked ? "underline decoration-amber-500 decoration-2" : ""}`}
+      className={`px-1 rounded-md ${tone} ${marked ? "underline decoration-amber-500 decoration-2" : ""}`}
     >
       {word.surface}
     </button>
@@ -135,30 +155,29 @@ export function VerseSession() {
   const [selectedWordIds, setSelectedWordIds] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [phase, setPhase] = useState<"parse" | "translate">("parse");
+  const [english, setEnglish] = useState("");
+  const [translateWordIds, setTranslateWordIds] = useState<string[]>([]);
+  const [showCompare, setShowCompare] = useState(false);
   const [miss, setMiss] = useState<{ field: keyof ParseFields; priorMisses: number } | null>(null);
   const [whyOpen, setWhyOpen] = useState(false);
   const [definitionWord, setDefinitionWord] = useState<Word | null>(null);
+  const [glossWordId, setGlossWordId] = useState<string | null>(null);
   const [tutorReply, setTutorReply] = useState<string | null>(null);
   const [tutorError, setTutorError] = useState<string | null>(null);
   const [tutorLoading, setTutorLoading] = useState(false);
   const [token, setToken] = useState("");
   const confettiTriggered = useRef(false);
-  // Auto-jump to translate on first full parse; suppressed after "Back to parsing"
-  // until the verse is incomplete again (or a new verse loads).
-  const autoJumpToTranslate = useRef(true);
+  const restoredProgress = useRef(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
   const pairs = useMemo(() => articlePairs(verseData?.words ?? []), [verseData]);
 
   async function loadRef(book: string, chap: string, verse: string) {
     const formatted = formatRef(book, chap, verse);
     setState({ kind: "loading", ref: formatted });
-    setAnswers({});
-    setPhase("parse");
     setMiss(null);
     setWhyOpen(false);
     setTutorReply(null);
     confettiTriggered.current = false;
-    autoJumpToTranslate.current = true;
     try {
       const loaded = await loadVerse(formatted);
       const lemmas = loaded.words.map((word) => word.lemma).filter(Boolean) as string[];
@@ -180,9 +199,20 @@ export function VerseSession() {
           };
         }),
       };
+      const saved = readProgress(withGlosses.ref);
+      const progress = progressForVerse(
+        saved,
+        withGlosses.words.map((word) => word.id)
+      );
+      restoredProgress.current = saved !== null;
       setState({ kind: "loaded", verse: withGlosses });
-      setSelectedWordIds(new Set(withGlosses.words.map((word) => word.id)));
-      setActiveId(withGlosses.words[0]?.id ?? null);
+      setAnswers(progress.answers);
+      setSelectedWordIds(new Set(progress.selectedWordIds));
+      setActiveId(progress.activeId);
+      setPhase(progress.phase);
+      setEnglish(progress.english);
+      setTranslateWordIds(progress.translateWordIds);
+      setShowCompare(progress.showCompare);
       try {
         localStorage.setItem(VERSE_KEY, formatted);
       } catch {
@@ -218,28 +248,33 @@ export function VerseSession() {
     return fields.every((field) => normalizeMissing(answers[word.id]?.[field.key]));
   });
 
-  const allCorrect = wordsToShow.length > 0 && wordsToShow.every((word) => {
-    const score = scoreParse(word.parse, answers[word.id] ?? {});
-    return score.total > 0 && score.correct === score.total;
-  });
+  const attempted = wordsToShow.some((word) =>
+    Object.values(answers[word.id] ?? {}).some((value) => normalizeMissing(value))
+  );
 
   useEffect(() => {
-    if (allCorrect && !confettiTriggered.current) {
-      celebrateWithConfetti();
-      confettiTriggered.current = true;
-    }
-  }, [allCorrect]);
-
-  useEffect(() => {
-    if (!allFilled) {
-      autoJumpToTranslate.current = true;
+    if (restoredProgress.current) {
+      restoredProgress.current = false;
+      if (allFilled && attempted) confettiTriggered.current = true;
       return;
     }
-    if (phase === "parse" && autoJumpToTranslate.current) {
-      autoJumpToTranslate.current = false;
-      setPhase("translate");
-    }
-  }, [allFilled, phase]);
+    if (!allFilled || !attempted || confettiTriggered.current) return;
+    celebrateWithConfetti();
+    confettiTriggered.current = true;
+  }, [allFilled, attempted]);
+
+  useEffect(() => {
+    if (!verseData) return;
+    writeProgress(verseData.ref, {
+      phase,
+      answers,
+      selectedWordIds: [...selectedWordIds],
+      activeId,
+      english,
+      translateWordIds,
+      showCompare,
+    });
+  }, [verseData, phase, answers, selectedWordIds, activeId, english, translateWordIds, showCompare]);
 
   const cueDisplay = active ? findCue(verseData?.words ?? [], active.parse)?.display : undefined;
 
@@ -429,7 +464,7 @@ export function VerseSession() {
           }}
         />
 
-        {verseData && wordsToShow.length > 0 && phase === "parse" && active && (
+        {verseData && phase === "parse" && (
           <>
             <div className="font-greek text-2xl leading-relaxed mx-auto flex w-fit max-w-full flex-wrap items-baseline gap-x-3 gap-y-3">
               {verseSegments(verseData.words, pairs).map((segment) => {
@@ -445,8 +480,9 @@ export function VerseSession() {
                         <WordButton
                           key={word.id}
                           word={word}
-                          active={word.id === active.id}
+                          active={word.id === active?.id}
                           selected={selectedWordIds.has(word.id)}
+                          parsed={wordParsed(word, answers[word.id], word.id === segment.pair.articleId)}
                           marked={Boolean(cueDisplay && foldGreek(word.surface) === foldGreek(cueDisplay) && note)}
                           onSelect={() => selectWord(word.id)}
                         />
@@ -458,8 +494,13 @@ export function VerseSession() {
                   <WordButton
                     key={segment.word.id}
                     word={segment.word}
-                    active={segment.word.id === active.id}
+                    active={segment.word.id === active?.id}
                     selected={selectedWordIds.has(segment.word.id)}
+                    parsed={wordParsed(
+                      segment.word,
+                      answers[segment.word.id],
+                      pairs.some((pair) => pair.articleId === segment.word.id)
+                    )}
                     marked={Boolean(
                       cueDisplay && foldGreek(segment.word.surface) === foldGreek(cueDisplay) && note
                     )}
@@ -469,19 +510,60 @@ export function VerseSession() {
               })}
             </div>
 
+            {active ? (
+            <>
             <div className="card mx-auto w-fit max-w-full space-y-2 p-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <div className="font-greek text-3xl">{active.surface}</div>
-                {active.lemma && (
-                  <button
-                    type="button"
-                    className="badge"
-                    onClick={() => setDefinitionWord(active)}
+              {active.definition?.brief ? (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="flex w-full cursor-pointer items-baseline justify-between gap-3 text-left"
+                  aria-expanded={glossWordId === active.id}
+                  onClick={() =>
+                    setGlossWordId((current) => (current === active.id ? null : active.id))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    setGlossWordId((current) => (current === active.id ? null : active.id));
+                  }}
+                >
+                  <span className="font-greek text-3xl">{active.surface}</span>
+                  <span
+                    className={`min-w-0 flex-1 text-center text-sm ${
+                      glossWordId === active.id ? "text-slate-600" : "text-slate-400"
+                    }`}
                   >
-                    {active.lemma}
-                  </button>
-                )}
-              </div>
+                    {glossWordId === active.id ? active.definition.brief : "tap for gloss"}
+                  </span>
+                  {active.lemma && (
+                    <button
+                      type="button"
+                      className="badge"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDefinitionWord(active);
+                      }}
+                    >
+                      {active.lemma}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="font-greek text-3xl">{active.surface}</div>
+                  {active.lemma && (
+                    <button
+                      type="button"
+                      className="badge"
+                      onClick={() => setDefinitionWord(active)}
+                    >
+                      {active.lemma}
+                    </button>
+                  )}
+                </div>
+              )}
               {visibleFields(active, answers[active.id], pairs.some((pair) => pair.articleId === active.id)).map((field) => {
                 const value = answers[active.id]?.[field.key] ?? "";
                 const gold = normalizeMissing(active.parse?.[field.key]);
@@ -525,18 +607,24 @@ export function VerseSession() {
                   type="button"
                   className="text-sm text-slate-600 underline py-1"
                   onClick={() => {
+                    const remaining = wordsToShow.filter((word) => word.id !== active.id);
                     setSelectedWordIds((prev) => {
                       const next = new Set(prev);
                       next.delete(active.id);
                       return next;
                     });
-                    const remaining = wordsToShow.filter((word) => word.id !== active.id);
+                    setMiss(null);
+                    if (remaining.length === 0) {
+                      setActiveId(null);
+                      setPhase("translate");
+                      return;
+                    }
                     setActiveId(remaining[0]?.id ?? null);
                   }}
                 >
                   Skip this word
                 </button>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     className="btn"
@@ -545,20 +633,38 @@ export function VerseSession() {
                   >
                     Previous
                   </button>
-                  {activeIndex < wordsToShow.length - 1 && (
-                    <button type="button" className="btn" onClick={() => showWord(activeIndex + 1)}>
-                      Next
+                  {(allFilled || activeIndex < wordsToShow.length - 1) && (
+                    <button
+                      type="button"
+                      className={`btn ${
+                        allFilled ||
+                        wordParsed(
+                          active,
+                          answers[active.id],
+                          pairs.some((pair) => pair.articleId === active.id)
+                        )
+                          ? "!border-green-700 !bg-green-700 hover:!bg-green-800"
+                          : ""
+                      }`}
+                      onClick={() => (allFilled ? setPhase("translate") : showWord(activeIndex + 1))}
+                    >
+                      {allFilled ? "Translate this verse" : "Next"}
+                    </button>
+                  )}
+                  {!note && (
+                    <button
+                      type="button"
+                      className="text-sm underline"
+                      onClick={() => setWhyOpen((open) => !open)}
+                    >
+                      {whyOpen ? "Hide why" : "Why this form"}
                     </button>
                   )}
                 </div>
-                {!note && (
-                  <button
-                    type="button"
-                    className="ml-auto text-sm underline"
-                    onClick={() => setWhyOpen((open) => !open)}
-                  >
-                    {whyOpen ? "Hide why" : "Why this form"}
-                  </button>
+                {approved && (
+                  <div className="ml-auto">
+                    <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
+                  </div>
                 )}
               </div>
             </div>
@@ -631,24 +737,35 @@ export function VerseSession() {
                 ))}
               </div>
             )}
+            </>
+            ) : (
+              <div className="card mx-auto w-fit max-w-full space-y-3 p-4">
+                <p className="text-sm text-slate-700">Every word was skipped.</p>
+                <button type="button" className="btn" onClick={() => setPhase("translate")}>
+                  Translate this verse
+                </button>
+              </div>
+            )}
           </>
         )}
 
         {verseData && phase === "translate" && (
-          <TranslateStep verse={verseData} words={wordsToShow} />
+          <TranslateStep
+            key={verseData.ref}
+            verse={verseData}
+            english={english}
+            onEnglish={setEnglish}
+            translateWordIds={translateWordIds}
+            onTranslateWordIds={setTranslateWordIds}
+            showCompare={showCompare}
+            onShowCompare={setShowCompare}
+          />
         )}
 
-        {/* One Turnstile for miss explain and/or whole-parse explain */}
-        {verseData &&
-          phase === "parse" &&
-          approved &&
-          (Boolean(note) || correctNotes.length > 1) && (
-            <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
-          )}
         {verseData && <Footer />}
       </div>
 
-      {verseData && wordsToShow.length > 0 && (
+      {verseData && (
         <div className="fixed bottom-0 inset-x-0 border-t bg-white">
           <div className="w-full px-4 py-3 flex items-center justify-between gap-2">
             <div className="text-sm text-slate-600">
@@ -658,16 +775,13 @@ export function VerseSession() {
               <button
                 type="button"
                 className="btn"
-                onClick={() => {
-                  autoJumpToTranslate.current = false;
-                  setPhase("parse");
-                }}
+                onClick={() => setPhase("parse")}
               >
                 Back to parsing
               </button>
-            ) : allFilled ? (
+            ) : allFilled || wordsToShow.length === 0 ? (
               <button type="button" className="btn" onClick={() => setPhase("translate")}>
-                Translate
+                {wordsToShow.length === 0 ? "Translate this verse" : "Translate"}
               </button>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-3">
@@ -677,10 +791,7 @@ export function VerseSession() {
                 <button
                   type="button"
                   className="btn"
-                  onClick={() => {
-                    autoJumpToTranslate.current = false;
-                    setPhase("translate");
-                  }}
+                  onClick={() => setPhase("translate")}
                 >
                   Skip to translate
                 </button>
