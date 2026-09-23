@@ -36,6 +36,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   if (!isOpen) return null;
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the click only dismisses on the backdrop; keyboard users close the native dialog with Escape, which fires the close handler above.
     <dialog
       ref={dialogRef}
       className="rounded-lg shadow-xl p-0 max-w-4xl w-full max-h-[90vh] backdrop:bg-black/50"

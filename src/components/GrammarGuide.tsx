@@ -44,8 +44,8 @@ export function GrammarGuide() {
       <div className="flex-1 min-w-0">
         <h3 className="text-2xl font-bold mb-6 text-slate-800">{currentSection.title}</h3>
         <div className="space-y-6">
-          {currentSection.items.map((item, idx) => (
-            <div key={idx} className="border-l-4 border-blue-500 pl-4">
+          {currentSection.items.map((item) => (
+            <div key={item.term} className="border-l-4 border-blue-500 pl-4">
               <h4 className="text-lg font-semibold text-slate-800 mb-2">{item.term}</h4>
               <p className="text-slate-700 mb-2">{item.definition}</p>
               <p className="text-sm text-slate-600 italic">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSession } from "../session";
 import {
@@ -44,16 +44,16 @@ function AdminList() {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     const data = await getAdminUsers();
     setUsers(data.users);
-  }
+  }, []);
 
   useEffect(() => {
     load().catch((err: unknown) => {
       setError(err instanceof Error ? err.message : "Could not load users.");
     });
-  }, []);
+  }, [load]);
 
   async function setStatus(id: string, status: string) {
     await updateAdminUser(id, { status });

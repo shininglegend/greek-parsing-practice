@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { loadVerse } from "../api";
 import { prefetchLemmas } from "../lexicon";
 import type { Verse, Word } from "../types";
@@ -10,6 +10,41 @@ type State =
   | { kind: "loading"; ref: string }
   | { kind: "loaded"; verse: Verse }
   | { kind: "error"; msg: string };
+
+type CompareOptions = { ignoreAccents: boolean; ignoreBreathing: boolean; ignoreCase: boolean };
+
+function normalizeForComparison(text: string, options: CompareOptions): string {
+  // Start with NFD normalization to decompose precomposed characters
+  let normalized = text.normalize("NFD");
+
+  if (options.ignoreAccents) {
+    // Remove accent marks
+    normalized = normalized.replace(/[\u0300-\u0304\u0308\u0340-\u0344\u0345]/g, "");
+  }
+  if (options.ignoreBreathing) {
+    // Remove breathing marks
+    normalized = normalized.replace(/[\u0313\u0314]/g, "");
+  }
+
+  // Recompose to NFC for consistent comparison
+  normalized = normalized.normalize("NFC");
+
+  if (options.ignoreCase) {
+    // Convert to lowercase for case-insensitive comparison
+    normalized = normalized.toLowerCase();
+  }
+
+  // Always remove punctuation
+  normalized = normalized.replace(/[.,;:!?·—\-\s]/g, "");
+
+  return normalized;
+}
+
+function matchesSurface(word: Word, input: string | undefined, options: CompareOptions): boolean {
+  const typed = input?.trim() || "";
+  if (!typed) return false;
+  return normalizeForComparison(typed, options) === normalizeForComparison(word.surface, options);
+}
 
 export function ReverseParser() {
   const [selectedBook, setSelectedBook] = useState("Jn");
@@ -24,18 +59,21 @@ export function ReverseParser() {
   const [lexiconLoaded, setLexiconLoaded] = useState(false);
   const [loadingLexicon, setLoadingLexicon] = useState(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
+  // Set once the whole verse has been celebrated; cleared whenever a verse starts loading.
+  const confettiTriggered = useRef(false);
 
   async function load() {
     const formatted = formatRef(selectedBook, chapter, verse);
     setState({ kind: "loading", ref: formatted });
+    confettiTriggered.current = false;
     setUserInputs({});
     setRevealed(false);
     setLexiconLoaded(false);
     try {
       const v = await loadVerse(formatted);
       setState({ kind: "loaded", verse: v });
-    } catch (e: any) {
-      setState({ kind: "error", msg: e.message || "error" });
+    } catch (e) {
+      setState({ kind: "error", msg: e instanceof Error ? e.message : "error" });
     }
   }
 
@@ -49,14 +87,15 @@ export function ReverseParser() {
     setVerse(newVerse.toString());
     const formatted = formatRef(selectedBook, chapter, newVerse.toString());
     setState({ kind: "loading", ref: formatted });
+    confettiTriggered.current = false;
     setUserInputs({});
     setRevealed(false);
     setLexiconLoaded(false);
     try {
       const v = await loadVerse(formatted);
       setState({ kind: "loaded", verse: v });
-    } catch (e: any) {
-      setState({ kind: "error", msg: e.message || "error" });
+    } catch (e) {
+      setState({ kind: "error", msg: e instanceof Error ? e.message : "error" });
     }
   }
 
@@ -90,15 +129,19 @@ export function ReverseParser() {
 
       setState({ kind: "loaded", verse: updatedVerse });
       setLexiconLoaded(true);
-    } catch (e: any) {
+    } catch (e) {
       console.error("Failed to load lexicon:", e);
     } finally {
       setLoadingLexicon(false);
     }
   }
 
-  useEffect(() => {
+  // Load the starting verse once on mount. Later loads go through the selector.
+  const loadInitial = useEffectEvent(() => {
     load();
+  });
+  useEffect(() => {
+    loadInitial();
   }, []);
 
   const surfaceLine = useMemo(
@@ -116,41 +159,13 @@ export function ReverseParser() {
     setUserInputs((prev) => ({ ...prev, [wordId]: value }));
   }
 
-  function normalizeForComparison(text: string): string {
-    // Start with NFD normalization to decompose precomposed characters
-    let normalized = text.normalize("NFD");
-
-    if (ignoreAccents) {
-      // Remove accent marks
-      normalized = normalized.replace(/[\u0300-\u0304\u0308\u0340-\u0344\u0345]/g, "");
-    }
-    if (ignoreBreathing) {
-      // Remove breathing marks
-      normalized = normalized.replace(/[\u0313\u0314]/g, "");
-    }
-
-    // Recompose to NFC for consistent comparison
-    normalized = normalized.normalize("NFC");
-
-    if (ignoreCase) {
-      // Convert to lowercase for case-insensitive comparison
-      normalized = normalized.toLowerCase();
-    }
-
-    // Always remove punctuation
-    normalized = normalized.replace(/[.,;:!?·—\-\s]/g, "");
-
-    return normalized;
-  }
+  const compareOptions = useMemo<CompareOptions>(
+    () => ({ ignoreAccents, ignoreBreathing, ignoreCase }),
+    [ignoreAccents, ignoreBreathing, ignoreCase]
+  );
 
   function isCorrect(word: Word): boolean {
-    const input = userInputs[word.id]?.trim() || "";
-    if (!input) return false;
-
-    const normalizedInput = normalizeForComparison(input);
-    const normalizedSurface = normalizeForComparison(word.surface);
-
-    return normalizedInput === normalizedSurface;
+    return matchesSurface(word, userInputs[word.id], compareOptions);
   }
 
   function getInputClassName(word: Word): string {
@@ -174,26 +189,20 @@ export function ReverseParser() {
     return fields;
   }
 
-  // Track if confetti has been triggered for this verse
-  const confettiTriggered = useRef(false);
-
   // Check if all words are correctly typed
   useEffect(() => {
     if (!verseData || verseData.words.length === 0 || confettiTriggered.current || revealed) return;
 
     // Check if all words are correct
-    const allCorrect = verseData.words.every((w) => isCorrect(w));
+    const allCorrect = verseData.words.every((w) =>
+      matchesSurface(w, userInputs[w.id], compareOptions)
+    );
 
     if (allCorrect) {
       celebrateWithConfetti();
       confettiTriggered.current = true;
     }
-  }, [userInputs, verseData, revealed]);
-
-  // Reset confetti trigger when verse changes
-  useEffect(() => {
-    confettiTriggered.current = false;
-  }, [verseData]);
+  }, [userInputs, verseData, revealed, compareOptions]);
 
   return (
     <>
@@ -342,9 +351,9 @@ export function ReverseParser() {
 
                       {/* Parse fields */}
                       <div className="space-y-0.5">
-                        {displayFields.map((field, idx) => (
+                        {displayFields.map((field) => (
                           <div
-                            key={idx}
+                            key={field.label}
                             className="text-xs text-center p-0.5 bg-slate-100 rounded-sm"
                           >
                             <div className="font-medium text-slate-600 text-[10px] leading-tight">

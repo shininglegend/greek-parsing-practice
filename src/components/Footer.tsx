@@ -8,14 +8,14 @@ export function Footer() {
           MorphGNT
         </a>
         <hr />
-        Copyright 2025 Titus Murphy. All rights reserved. For issues or requests, submit an issue by
-        clicking{" "}
+        Copyright 2025 Titus Murphy. All rights reserved. For issues or requests,{" "}
         <a
           className="text-blue-500 font-bold"
           href="https://github.com/shininglegend/greek-parsing-practice/issues"
         >
-          here.
+          open an issue on GitHub
         </a>
+        .
       </div>
     </>
   );

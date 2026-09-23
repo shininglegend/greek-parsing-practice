@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { loadVerse } from "../api";
 import {
@@ -239,10 +239,12 @@ export function VerseSession() {
     }
   }
 
-  useEffect(() => {
+  // Load the verse from the URL once. Later loads go through the selector.
+  const loadInitial = useEffectEvent(() => {
     loadRef(start.book, start.chapter, start.verse);
-    // Load the verse from the URL once. Later loads go through the selector.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    loadInitial();
   }, []);
 
   const wordsToShow = verseData?.words.filter((word) => selectedWordIds.has(word.id)) ?? [];
@@ -550,37 +552,29 @@ export function VerseSession() {
               <>
                 <div className="card mx-auto w-fit max-w-full space-y-2 p-3">
                   {active.definition?.brief ? (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      className="flex w-full cursor-pointer items-baseline justify-between gap-3 text-left"
-                      aria-expanded={glossWordId === active.id}
-                      onClick={() =>
-                        setGlossWordId((current) => (current === active.id ? null : active.id))
-                      }
-                      onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget) return;
-                        if (event.key !== "Enter" && event.key !== " ") return;
-                        event.preventDefault();
-                        setGlossWordId((current) => (current === active.id ? null : active.id));
-                      }}
-                    >
-                      <span className="font-greek text-3xl">{active.surface}</span>
-                      <span
-                        className={`min-w-0 flex-1 text-center text-sm ${
-                          glossWordId === active.id ? "text-slate-600" : "text-slate-400"
-                        }`}
+                    <div className="flex w-full items-baseline justify-between gap-3">
+                      <button
+                        type="button"
+                        className="flex min-w-0 flex-1 cursor-pointer items-baseline justify-between gap-3 text-left"
+                        aria-expanded={glossWordId === active.id}
+                        onClick={() =>
+                          setGlossWordId((current) => (current === active.id ? null : active.id))
+                        }
                       >
-                        {glossWordId === active.id ? active.definition.brief : "tap for gloss"}
-                      </span>
+                        <span className="font-greek text-3xl">{active.surface}</span>
+                        <span
+                          className={`min-w-0 flex-1 text-center text-sm ${
+                            glossWordId === active.id ? "text-slate-600" : "text-slate-400"
+                          }`}
+                        >
+                          {glossWordId === active.id ? active.definition.brief : "tap for gloss"}
+                        </span>
+                      </button>
                       {active.lemma && (
                         <button
                           type="button"
                           className="badge"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDefinitionWord(active);
-                          }}
+                          onClick={() => setDefinitionWord(active)}
                         >
                           {active.lemma}
                         </button>

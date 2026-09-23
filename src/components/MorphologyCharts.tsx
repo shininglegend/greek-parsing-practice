@@ -49,8 +49,8 @@ export function MorphologyCharts({ initialChart = "article" }: { initialChart?: 
       <div className="flex-1 min-w-0">
         <h3 className="text-2xl font-bold mb-6 text-slate-800">{currentChart.title}</h3>
         <div className="space-y-8">
-          {currentChart.tables.map((table, idx) => (
-            <div key={idx}>
+          {currentChart.tables.map((table) => (
+            <div key={table.subtitle ?? table.headers.join("|")}>
               {table.subtitle && (
                 <h4 className="text-lg font-semibold text-slate-700 mb-3">{table.subtitle}</h4>
               )}
@@ -58,9 +58,9 @@ export function MorphologyCharts({ initialChart = "article" }: { initialChart?: 
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-slate-100">
-                      {table.headers.map((header, hIdx) => (
+                      {table.headers.map((header) => (
                         <th
-                          key={hIdx}
+                          key={header}
                           className="border border-slate-300 px-4 py-2 text-left font-semibold text-slate-700"
                         >
                           {header}
@@ -69,11 +69,11 @@ export function MorphologyCharts({ initialChart = "article" }: { initialChart?: 
                     </tr>
                   </thead>
                   <tbody>
-                    {table.rows.map((row, rIdx) => (
-                      <tr key={rIdx} className="hover:bg-slate-50">
+                    {table.rows.map((row) => (
+                      <tr key={row[0]} className="hover:bg-slate-50">
                         {row.map((cell, cIdx) => (
                           <td
-                            key={cIdx}
+                            key={table.headers[cIdx]}
                             className={`border border-slate-300 px-2 py-2 ${
                               cIdx === 0
                                 ? "font-medium text-slate-700"

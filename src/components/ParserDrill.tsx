@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { loadVerse } from "../api";
 import { prefetchLemmas } from "../lexicon";
 import type { DrillAnswer, Verse } from "../types";
@@ -21,10 +21,13 @@ export function ParserDrill() {
   const [lexiconLoaded, setLexiconLoaded] = useState(false);
   const [loadingLexicon, setLoadingLexicon] = useState(false);
   const verseData = state.kind === "loaded" ? state.verse : undefined;
+  // Set once the whole verse has been celebrated; cleared whenever a verse starts loading.
+  const confettiTriggered = useRef(false);
 
   async function load() {
     const formatted = formatRef(selectedBook, chapter, verse);
     setState({ kind: "loading", ref: formatted });
+    confettiTriggered.current = false;
     setAnswers({});
     setLexiconLoaded(false);
     try {
@@ -32,8 +35,8 @@ export function ParserDrill() {
       setState({ kind: "loaded", verse: v });
       // Initially select all words
       setSelectedWordIds(new Set(v.words.map((w) => w.id)));
-    } catch (e: any) {
-      setState({ kind: "error", msg: e.message || "error" });
+    } catch (e) {
+      setState({ kind: "error", msg: e instanceof Error ? e.message : "error" });
     }
   }
 
@@ -47,6 +50,7 @@ export function ParserDrill() {
     setVerse(newVerse.toString());
     const formatted = formatRef(selectedBook, chapter, newVerse.toString());
     setState({ kind: "loading", ref: formatted });
+    confettiTriggered.current = false;
     setAnswers({});
     setLexiconLoaded(false);
     try {
@@ -54,13 +58,17 @@ export function ParserDrill() {
       setState({ kind: "loaded", verse: v });
       // Initially select all words
       setSelectedWordIds(new Set(v.words.map((w) => w.id)));
-    } catch (e: any) {
-      setState({ kind: "error", msg: e.message || "error" });
+    } catch (e) {
+      setState({ kind: "error", msg: e instanceof Error ? e.message : "error" });
     }
   }
 
+  // Load the starting verse once on mount. Later loads go through the selector.
+  const loadInitial = useEffectEvent(() => {
+    load();
+  });
   useEffect(() => {
-    load(); /* initial load */
+    loadInitial();
   }, []);
 
   const surfaceLine = useMemo(
@@ -114,7 +122,7 @@ export function ParserDrill() {
 
       setState({ kind: "loaded", verse: updatedVerse });
       setLexiconLoaded(true);
-    } catch (e: any) {
+    } catch (e) {
       console.error("Failed to load lexicon:", e);
     } finally {
       setLoadingLexicon(false);
@@ -123,9 +131,6 @@ export function ParserDrill() {
 
   // Filter words to only show selected ones
   const wordsToShow = verseData?.words.filter((w) => selectedWordIds.has(w.id)) ?? [];
-
-  // Track if confetti has been triggered for this verse
-  const confettiTriggered = useRef(false);
 
   // Check if all selected words are correctly parsed
   useEffect(() => {
@@ -153,11 +158,6 @@ export function ParserDrill() {
       confettiTriggered.current = true;
     }
   }, [answers, verseData, wordsToShow]);
-
-  // Reset confetti trigger when verse changes
-  useEffect(() => {
-    confettiTriggered.current = false;
-  }, [verseData]);
 
   return (
     <>

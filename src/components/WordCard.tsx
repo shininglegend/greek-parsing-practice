@@ -39,18 +39,19 @@ export function WordCard({ w, answer, onChange, disabled }: WordCardProps) {
         </button>
         <div className="text-xl font-semibold">{w.surface}</div>
         {w.lemma && (
-          <div
+          <button
+            type="button"
             className="badge cursor-pointer hover:bg-slate-200 transition-colors relative group"
             onClick={() => setShowFullDefinition(true)}
             title={w.definition?.brief || "lemma"}
           >
             lemma: {w.lemma}
             {w.definition?.brief && (
-              <div className="absolute left-0 top-full mt-1 hidden group-hover:block bg-slate-800 text-white text-xs rounded-sm px-2 py-1 whitespace-normal max-w-xs z-10 shadow-lg">
+              <span className="absolute left-0 top-full mt-1 hidden group-hover:block bg-slate-800 text-white text-xs rounded-sm px-2 py-1 whitespace-normal max-w-xs z-10 shadow-lg text-left">
                 {w.definition.brief}
-              </div>
+              </span>
             )}
-          </div>
+          </button>
         )}
       </div>
       {open && (

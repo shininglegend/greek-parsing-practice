@@ -27,9 +27,8 @@ const BASE_URL =
  * Fetch lexicon data for a specific Greek letter
  */
 async function fetchLetterData(letter: string): Promise<LexiconEntry[]> {
-  if (cache.has(letter)) {
-    return cache.get(letter)!;
-  }
+  const cached = cache.get(letter);
+  if (cached) return cached;
 
   try {
     const url = `${BASE_URL}/${encodeURIComponent(letter)}.json`;
