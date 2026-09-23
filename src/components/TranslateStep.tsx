@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { articlePairs, verseSegments } from "../articlePairs";
 import { buildChecklist } from "../checklist";
 import { useSession } from "../session";
-import { ApiError, askTutor, type EnglishVersions, getTranslations } from "../studyApi";
+import { ApiError, askTutor } from "../studyApi";
+import { type EnglishVersions, englishVersions } from "../translations";
 import { splitTutorNote } from "../tutorNote";
 import type { Verse, Word } from "../types";
 import { FIELD_SPECS, normalizeMissing } from "../utils";
@@ -194,9 +195,9 @@ export function TranslateStep({
 
   useEffect(() => {
     let cancelled = false;
-    getTranslations(verse.ref)
+    englishVersions(verse.ref)
       .then((data) => {
-        if (!cancelled) setVersions(data.versions);
+        if (!cancelled) setVersions(data);
       })
       .catch((error: unknown) => {
         if (!cancelled) {

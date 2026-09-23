@@ -45,6 +45,11 @@
   "ai": {
     "binding": "AI"
   },
+  "ratelimits": [
+    { "name": "TUTOR_LIMIT", "namespace_id": "1001", "simple": { "limit": 12, "period": 60 } },
+    { "name": "ATTEMPTS_LIMIT", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } },
+    { "name": "MAGIC_LINK_LIMIT", "namespace_id": "1004", "simple": { "limit": 1, "period": 60 } }
+  ],
   "send_email": [
     {
       "name": "EMAIL",

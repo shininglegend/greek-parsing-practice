@@ -14,12 +14,6 @@ export type WeakSpot = {
   verseRef: string | null;
 };
 
-export type EnglishVersions = {
-  web: string | null;
-  kjv: string | null;
-  asv: string | null;
-};
-
 export class ApiError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -81,12 +75,17 @@ export function recordAttempt(attempt: {
   });
 }
 
-export function getWeakSpots() {
-  return request<{ spots: WeakSpot[] }>("/api/weak-spots");
+export function importAttempts(
+  attempts: Array<Parameters<typeof recordAttempt>[0] & { createdAt: string }>
+) {
+  return request<{ imported: number }>("/api/attempts/import", {
+    method: "POST",
+    body: JSON.stringify({ attempts }),
+  });
 }
 
-export function getTranslations(ref: string) {
-  return request<{ versions: EnglishVersions }>(`/api/translations?ref=${encodeURIComponent(ref)}`);
+export function getWeakSpots() {
+  return request<{ spots: WeakSpot[] }>("/api/weak-spots");
 }
 
 export function askTutor(

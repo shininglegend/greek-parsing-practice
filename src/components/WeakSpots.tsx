@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getWeakSpots, type WeakSpot } from "../studyApi";
+import { isSignedIn, loadWeakSpots } from "../attempts";
+import { useSession } from "../session";
+import type { WeakSpot } from "../studyApi";
 import { Footer, Header } from "./";
 
 const FIELD_LABEL: Record<string, string> = {
@@ -15,16 +17,18 @@ const FIELD_LABEL: Record<string, string> = {
 };
 
 export function WeakSpots() {
+  const { user, loading } = useSession();
   const [spots, setSpots] = useState<WeakSpot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getWeakSpots()
-      .then((data) => setSpots(data.spots))
+    if (loading) return;
+    loadWeakSpots(user)
+      .then(setSpots)
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Could not load weak spots.");
       });
-  }, []);
+  }, [user, loading]);
 
   return (
     <>
@@ -32,8 +36,10 @@ export function WeakSpots() {
       <div className="mx-auto max-w-lg p-4 space-y-3">
         <h2 className="text-xl font-bold">Weak spots</h2>
         <p className="text-sm text-slate-600">
-          Counts of graded fields on this browser’s account. Open a verse that contains a recent
-          miss.
+          {isSignedIn(user)
+            ? "Counts of graded fields on your account."
+            : "Counts of graded fields saved in this browser. Sign in to keep them on an account."}{" "}
+          Open a verse that contains a recent miss.
         </p>
         {error && <p className="text-sm text-red-700">{error}</p>}
         {spots && spots.length === 0 && (

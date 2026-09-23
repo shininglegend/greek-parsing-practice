@@ -104,6 +104,18 @@ const PARAGRAPH_TOKENS = 1024;
 // Room for a reasoning trace plus the finished paragraph.
 const TRANSLATION_TOKENS = 8192;
 
+/**
+ * Tokens charged before the model answers. Greek tokenizes close to one token per
+ * character, so the input side rounds up; the output side is the whole allowance.
+ * The row is corrected once real usage arrives. If the model reports none, this stands.
+ */
+export function tutorBudget(prompt: string, think: boolean): { input: number; output: number } {
+  return {
+    input: Math.ceil(prompt.length / 2),
+    output: think ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS,
+  };
+}
+
 type Usage = {
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -219,14 +231,15 @@ async function logCall(
   input: number,
   output: number,
   cacheHit: boolean
-) {
+): Promise<string> {
+  const id = crypto.randomUUID();
   await env.DB.prepare(
     `INSERT INTO ai_log
       (id, user_id, kind, prompt, reply, input_tokens, output_tokens, cache_hit, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
-      crypto.randomUUID(),
+      id,
       userId,
       kind,
       prompt,
@@ -237,6 +250,7 @@ async function logCall(
       new Date().toISOString()
     )
     .run();
+  return id;
 }
 
 export async function runTutor(
@@ -244,8 +258,9 @@ export async function runTutor(
   user: UserRow,
   kind: "explain" | "translation",
   prompt: string
-): Promise<{ reply: string } | { error: "cap" | "model"; message: string }> {
-  const model = kind === "translation" ? env.AI_TRANSLATION_MODEL : env.AI_MODEL;
+): Promise<{ reply: string } | { error: "cap" | "rate" | "model"; message: string }> {
+  const model: string = kind === "translation" ? env.AI_TRANSLATION_MODEL : env.AI_MODEL;
+  const think = kind === "translation";
   // v2 drops replies cached while Kimi was still spending the token cap on a reasoning trace.
   const cacheKey = `ai:${await sha256(`v2\n${model}\n${kind}\n${prompt}`)}`;
   const cached = await env.CACHE.get(cacheKey);
@@ -262,21 +277,45 @@ export async function runTutor(
     };
   }
 
+  // A burst of parallel calls would each pass the cap check above before any of them
+  // is charged. The per-user limit bounds that burst; the reservation below charges
+  // each call before the model runs, so the next check sees it.
+  const { success } = await env.TUTOR_LIMIT.limit({ key: user.id });
+  if (!success) {
+    return { error: "rate", message: "Too many tutor requests. Wait a minute." };
+  }
+
+  const budget = tutorBudget(prompt, think);
+  const logId = await logCall(env, user.id, kind, prompt, "", budget.input, budget.output, false);
+
   let result: unknown;
   try {
-    result = await env.AI.run(model, tutorRequest(model, prompt, kind === "translation"), {
+    result = await env.AI.run(model, tutorRequest(model, prompt, think), {
       gateway: { id: env.AI_GATEWAY_ID || "default" },
     });
   } catch (error) {
     console.error(error);
+    await env.DB.prepare("DELETE FROM ai_log WHERE id = ?").bind(logId).run();
     return { error: "model", message: "The tutor could not answer just now." };
   }
 
   const read = readTutorResult(result);
   if (!read.text) {
+    await env.DB.prepare("DELETE FROM ai_log WHERE id = ?").bind(logId).run();
     return { error: "model", message: "The tutor returned an empty answer." };
   }
+  // Keep the reservation when the model reports no usage, so an unmetered reply still counts.
+  const reported = read.input > 0 || read.output > 0;
+  await env.DB.prepare(
+    "UPDATE ai_log SET reply = ?, input_tokens = ?, output_tokens = ? WHERE id = ?"
+  )
+    .bind(
+      read.text,
+      reported ? read.input : budget.input,
+      reported ? read.output : budget.output,
+      logId
+    )
+    .run();
   await env.CACHE.put(cacheKey, read.text, { expirationTtl: 60 * 60 * 24 * 14 });
-  await logCall(env, user.id, kind, prompt, read.text, read.input, read.output, false);
   return { reply: read.text };
 }

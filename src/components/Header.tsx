@@ -98,7 +98,7 @@ export function Header() {
                   autoComplete="email"
                 />
               </label>
-              <TurnstileField siteKey={turnstileSiteKey} onToken={setToken} />
+              <TurnstileField siteKey={turnstileSiteKey} action="signin" onToken={setToken} />
               <button
                 type="submit"
                 className="btn"

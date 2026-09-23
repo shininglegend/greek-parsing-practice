@@ -1,34 +1,96 @@
-import { asRecord, asString, json, readJson } from "./http";
+import { asRecord, asString, json, readJson, sha256 } from "./http";
 import {
+  anonymousUser,
   consumeMagicLink,
-  ensureSession,
   isAdminEmail,
   logout,
   magicLinkEmail,
   monthStartIso,
   publicUser,
+  readSession,
   sendMagicLink,
   signedInDocument,
   signInConfirmPage,
   type UserRow,
 } from "./session";
-import { englishVersions } from "./translations";
 import { aiBlock, explainPrompt, runTutor, translationPrompt } from "./tutor";
 
 const FIELDS = new Set(["pos", "case", "number", "gender", "tense", "voice", "mood", "person"]);
 
 async function requireAdmin(request: Request, env: Env) {
-  const session = await ensureSession(request, env);
-  if (session.user.role !== "admin" && !isAdminEmail(env, session.user.email ?? "")) {
+  const user = await readSession(request, env);
+  if (!user || (user.role !== "admin" && !isAdminEmail(env, user.email ?? ""))) {
+    return { denied: json({ error: "forbidden", message: "Admin only." }, { status: 403 }) };
+  }
+  return { denied: null };
+}
+
+/** Attempts are stored only for accounts. A guest keeps them in the browser. */
+async function requireAccount(request: Request, env: Env) {
+  const user = await readSession(request, env);
+  if (!user?.email) {
     return {
-      session,
-      denied: json(
-        { error: "forbidden", message: "Admin only." },
-        { status: 403, cookies: session.cookies }
-      ),
+      user: null,
+      denied: json({ error: "sign_in", message: "Sign in to save attempts." }, { status: 401 }),
     };
   }
-  return { session, denied: null };
+  return { user, denied: null };
+}
+
+type AttemptRow = {
+  verseRef: string;
+  wordId: string;
+  surface: string | null;
+  lemma: string | null;
+  field: string;
+  guess: string;
+  gold: string;
+  cue: string | null;
+};
+
+function readAttempt(body: Record<string, unknown> | null): AttemptRow | null {
+  const verseRef = asString(body?.verseRef, 40);
+  const wordId = asString(body?.wordId, 80);
+  const field = asString(body?.field, 20);
+  const gold = asString(body?.gold, 40);
+  const guess = asString(body?.guess, 40);
+  if (!verseRef || !wordId || !field || !gold || !guess || !FIELDS.has(field)) return null;
+  return {
+    verseRef,
+    wordId,
+    surface: asString(body?.surface, 80),
+    lemma: asString(body?.lemma, 80),
+    field,
+    guess,
+    gold,
+    cue: asString(body?.cue, 40),
+  };
+}
+
+function insertAttempt(env: Env, userId: string, id: string, a: AttemptRow, createdAt: string) {
+  return env.DB.prepare(
+    `INSERT INTO attempts
+      (id, user_id, verse_ref, word_id, surface, lemma, field, guess, gold, cue, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    id,
+    userId,
+    a.verseRef,
+    a.wordId,
+    a.surface,
+    a.lemma,
+    a.field,
+    a.guess,
+    a.gold,
+    a.cue,
+    createdAt
+  );
+}
+
+const IMPORT_MAX = 5000;
+
+function tooMany(message: string, cookies: string[] = []) {
+  return json({ error: "rate", message }, { status: 429, cookies });
 }
 
 async function verifyTurnstile(
@@ -59,14 +121,11 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
   const path = url.pathname;
 
   if (path === "/api/me" && request.method === "GET") {
-    const session = await ensureSession(request, env);
-    return json(
-      {
-        user: publicUser(session.user),
-        turnstileSiteKey: (env.TURNSTILE_SITE_KEY as string) || "",
-      },
-      { cookies: session.cookies }
-    );
+    const user = (await readSession(request, env)) ?? anonymousUser();
+    return json({
+      user: publicUser(user),
+      turnstileSiteKey: (env.TURNSTILE_SITE_KEY as string) || "",
+    });
   }
 
   if (path === "/api/auth/magic-link" && request.method === "POST") {
@@ -75,8 +134,17 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json({ error: "email", message: "Enter a valid email address." }, { status: 400 });
     }
-    if (!(await verifyTurnstile(request, env, body?.turnstileToken))) {
+    const turnstileOk = await verifyTurnstile(request, env, body?.turnstileToken, {
+      action: "signin",
+      hostname: url.hostname,
+    });
+    if (!turnstileOk) {
       return json({ error: "turnstile", message: "The check failed. Try again." }, { status: 400 });
+    }
+    // One sign-in email per address per minute, so nobody can flood an inbox from our sender.
+    const { success } = await env.MAGIC_LINK_LIMIT.limit({ key: await sha256(email) });
+    if (!success) {
+      return tooMany("A sign-in link was sent a moment ago. Check your inbox or wait a minute.");
     }
     try {
       const sent = await sendMagicLink(request, env, email);
@@ -150,52 +218,56 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
   }
 
   if (path === "/api/attempts" && request.method === "POST") {
-    const session = await ensureSession(request, env);
-    const body = asRecord(await readJson(request));
-    const verseRef = asString(body?.verseRef, 40);
-    const wordId = asString(body?.wordId, 80);
-    const field = asString(body?.field, 20);
-    const gold = asString(body?.gold, 40);
-    const guess = asString(body?.guess, 40);
-    if (!verseRef || !wordId || !field || !gold || !guess || !FIELDS.has(field)) {
-      return json(
-        { error: "attempt", message: "Incomplete attempt." },
-        { status: 400, cookies: session.cookies }
-      );
-    }
+    const { user, denied } = await requireAccount(request, env);
+    if (denied) return denied;
+    const paced = await env.ATTEMPTS_LIMIT.limit({ key: user.id });
+    if (!paced.success) return tooMany("Attempts are being saved too quickly. Wait a minute.");
+    const attempt = readAttempt(asRecord(await readJson(request)));
+    if (!attempt)
+      return json({ error: "attempt", message: "Incomplete attempt." }, { status: 400 });
     const id = crypto.randomUUID();
-    const cue = asString(body?.cue, 40);
-    await env.DB.prepare(
-      `INSERT INTO attempts
-        (id, user_id, verse_ref, word_id, surface, lemma, field, guess, gold, cue, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(
-        id,
-        session.user.id,
-        verseRef,
-        wordId,
-        asString(body?.surface, 80),
-        asString(body?.lemma, 80),
-        field,
-        guess,
-        gold,
-        cue,
-        new Date().toISOString()
-      )
-      .run();
+    await insertAttempt(env, user.id, id, attempt, new Date().toISOString()).run();
     const prior = await env.DB.prepare(
       `SELECT COUNT(*) AS n FROM attempts
        WHERE user_id = ? AND field = ? AND gold = ? AND guess != gold
          AND IFNULL(cue, '') = ? AND id != ?`
     )
-      .bind(session.user.id, field, gold, cue ?? "", id)
+      .bind(user.id, attempt.field, attempt.gold, attempt.cue ?? "", id)
       .first<{ n: number }>();
-    return json({ priorMisses: Number(prior?.n ?? 0) }, { cookies: session.cookies });
+    return json({ priorMisses: Number(prior?.n ?? 0) });
+  }
+
+  // What a browser saved before there was an account, sent once after sign-in.
+  if (path === "/api/attempts/import" && request.method === "POST") {
+    const { user, denied } = await requireAccount(request, env);
+    if (denied) return denied;
+    const paced = await env.ATTEMPTS_LIMIT.limit({ key: user.id });
+    if (!paced.success) return tooMany("Attempts are being saved too quickly. Wait a minute.");
+    const body = asRecord(await readJson(request));
+    const list = Array.isArray(body?.attempts) ? body.attempts : null;
+    if (!list || list.length > IMPORT_MAX) {
+      return json({ error: "attempts", message: "Send a list of attempts." }, { status: 400 });
+    }
+    const now = Date.now();
+    const statements = [];
+    for (const entry of list) {
+      const record = asRecord(entry);
+      const attempt = readAttempt(record);
+      if (!attempt) continue;
+      const stamp = Date.parse(asString(record?.createdAt, 40) ?? "");
+      const createdAt = new Date(
+        Number.isFinite(stamp) && stamp <= now ? stamp : now
+      ).toISOString();
+      statements.push(insertAttempt(env, user.id, crypto.randomUUID(), attempt, createdAt));
+    }
+    if (statements.length > 0) await env.DB.batch(statements);
+    return json({ imported: statements.length });
   }
 
   if (path === "/api/weak-spots" && request.method === "GET") {
-    const session = await ensureSession(request, env);
+    const { user, denied } = await requireAccount(request, env);
+    if (denied) return denied;
+    const session = { user, cookies: [] as string[] };
     const groups = await env.DB.prepare(
       `SELECT field, gold,
               SUM(CASE WHEN guess != gold THEN 1 ELSE 0 END) AS misses,
@@ -230,22 +302,9 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     return json({ spots }, { cookies: session.cookies });
   }
 
-  if (path === "/api/translations" && request.method === "GET") {
-    const ref = url.searchParams.get("ref") ?? "";
-    try {
-      const versions = await englishVersions(env, ref);
-      return json({ versions });
-    } catch (error) {
-      console.error(error);
-      return json(
-        { error: "translations", message: "The English versions could not be loaded." },
-        { status: 502 }
-      );
-    }
-  }
-
   if ((path === "/api/explain" || path === "/api/translation-note") && request.method === "POST") {
-    const session = await ensureSession(request, env);
+    const user = (await readSession(request, env)) ?? anonymousUser();
+    const session = { user, cookies: [] as string[] };
     const block = aiBlock(session.user);
     if (block) {
       const message =
@@ -274,7 +333,10 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     if ("error" in result) {
       return json(
         { error: result.error, message: result.message },
-        { status: result.error === "cap" ? 429 : 502, cookies: session.cookies }
+        {
+          status: result.error === "cap" || result.error === "rate" ? 429 : 502,
+          cookies: session.cookies,
+        }
       );
     }
     return json({ reply: result.reply }, { cookies: session.cookies });
@@ -282,7 +344,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
 
   const adminMatch = path.match(/^\/api\/admin\/users(?:\/([^/]+))?(?:\/(logs))?$/);
   if (adminMatch) {
-    const { session, denied } = await requireAdmin(request, env);
+    const { denied } = await requireAdmin(request, env);
     if (denied) return denied;
     const userId = adminMatch[1] ? decodeURIComponent(adminMatch[1]) : null;
     const logs = adminMatch[2] === "logs";
@@ -295,13 +357,12 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
                 (SELECT COALESCE(SUM(input_tokens), 0) FROM ai_log WHERE user_id = users.id AND cache_hit = 0 AND created_at >= ?) AS input_tokens,
                 (SELECT COALESCE(SUM(output_tokens), 0) FROM ai_log WHERE user_id = users.id AND cache_hit = 0 AND created_at >= ?) AS output_tokens
          FROM users
-         WHERE status != 'guest'
          ORDER BY created_at DESC
          LIMIT 200`
       )
         .bind(since, since, since)
         .all();
-      return json({ users: rows.results }, { cookies: session.cookies });
+      return json({ users: rows.results });
     }
 
     if (userId && logs && request.method === "GET") {
@@ -311,7 +372,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
       )
         .bind(userId)
         .all();
-      return json({ logs: rows.results }, { cookies: session.cookies });
+      return json({ logs: rows.results });
     }
 
     if (userId && request.method === "POST") {
@@ -319,15 +380,10 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
       const status = asString(body?.status, 20);
       const tokenCap = body?.tokenCap;
       if (status && !["pending", "approved", "denied"].includes(status)) {
-        return json(
-          { error: "status", message: "Unknown status." },
-          { status: 400, cookies: session.cookies }
-        );
+        return json({ error: "status", message: "Unknown status." }, { status: 400 });
       }
       if (status) {
-        await env.DB.prepare("UPDATE users SET status = ? WHERE id = ? AND status != 'guest'")
-          .bind(status, userId)
-          .run();
+        await env.DB.prepare("UPDATE users SET status = ? WHERE id = ?").bind(status, userId).run();
       }
       if (typeof tokenCap === "number" && tokenCap >= 0 && tokenCap <= 5_000_000) {
         await env.DB.prepare("UPDATE users SET token_cap = ? WHERE id = ?")
@@ -337,7 +393,7 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
       const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?")
         .bind(userId)
         .first<UserRow>();
-      return json({ user: user ? publicUser(user) : null }, { cookies: session.cookies });
+      return json({ user: user ? publicUser(user) : null });
     }
   }
 

@@ -11,10 +11,10 @@ export type UserRow = {
   created_at: string;
 };
 
-export type SessionResult = {
-  user: UserRow;
-  cookies: string[];
-};
+/** A visitor with no account. Nothing about them is stored; their attempts stay in the browser. */
+export function anonymousUser(): UserRow {
+  return { id: "", email: null, status: "guest", role: "user", token_cap: 0, created_at: "" };
+}
 
 export function publicUser(user: UserRow) {
   return {
@@ -69,34 +69,18 @@ async function insertSession(env: Env, userId: string, request: Request): Promis
   return sessionCookie(id, request, SESSION_SECONDS);
 }
 
-async function createGuest(env: Env): Promise<UserRow> {
-  const id = crypto.randomUUID();
-  const created = new Date().toISOString();
-  await env.DB.prepare(
-    "INSERT INTO users (id, email, status, role, token_cap, created_at) VALUES (?, NULL, 'guest', 'user', 20000, ?)"
-  )
-    .bind(id, created)
-    .run();
-  const user = await env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>();
-  if (!user) throw new Error("guest user missing");
-  return user;
-}
-
-export async function ensureSession(request: Request, env: Env): Promise<SessionResult> {
+/** The account behind the session cookie, or null when there is none. Guests have no row. */
+export async function readSession(request: Request, env: Env): Promise<UserRow | null> {
   const existing = readCookie(request.headers.get("Cookie"), "session");
-  if (existing) {
-    const user = await env.DB.prepare(
-      `SELECT users.* FROM sessions
-       JOIN users ON users.id = sessions.user_id
-       WHERE sessions.id = ? AND sessions.expires_at > ?`
-    )
-      .bind(existing, new Date().toISOString())
-      .first<UserRow>();
-    if (user) return { user: await promoteAdmin(env, user), cookies: [] };
-  }
-  const user = await createGuest(env);
-  const cookie = await insertSession(env, user.id, request);
-  return { user, cookies: [cookie] };
+  if (!existing) return null;
+  const user = await env.DB.prepare(
+    `SELECT users.* FROM sessions
+     JOIN users ON users.id = sessions.user_id
+     WHERE sessions.id = ? AND sessions.expires_at > ?`
+  )
+    .bind(existing, new Date().toISOString())
+    .first<UserRow>();
+  return user ? promoteAdmin(env, user) : null;
 }
 
 async function promoteAdmin(env: Env, user: UserRow): Promise<UserRow> {
@@ -242,7 +226,6 @@ export async function consumeMagicLink(
   if (!link || link.expires_at < new Date().toISOString()) return null;
   await env.DB.prepare("DELETE FROM magic_links WHERE token_hash = ?").bind(tokenHash).run();
 
-  const current = await ensureSession(request, env);
   let account = await env.DB.prepare("SELECT * FROM users WHERE email = ?")
     .bind(link.email)
     .first<UserRow>();
@@ -264,21 +247,6 @@ export async function consumeMagicLink(
   }
 
   if (!account) return null;
-
-  if (current.user.id !== account.id && current.user.status === "guest") {
-    await env.DB.batch([
-      env.DB.prepare("UPDATE attempts SET user_id = ? WHERE user_id = ?").bind(
-        account.id,
-        current.user.id
-      ),
-      env.DB.prepare("UPDATE ai_log SET user_id = ? WHERE user_id = ?").bind(
-        account.id,
-        current.user.id
-      ),
-      env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(current.user.id),
-      env.DB.prepare("DELETE FROM users WHERE id = ? AND status = 'guest'").bind(current.user.id),
-    ]);
-  }
 
   return insertSession(env, account.id, request);
 }

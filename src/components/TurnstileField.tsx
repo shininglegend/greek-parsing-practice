@@ -5,6 +5,7 @@ type TurnstileApi = {
     element: HTMLElement,
     options: {
       sitekey: string;
+      action?: string;
       callback: (token: string) => void;
       "expired-callback": () => void;
       "error-callback": () => void;
@@ -21,9 +22,12 @@ declare global {
 
 export function TurnstileField({
   siteKey,
+  action,
   onToken,
 }: {
   siteKey: string;
+  /** Checked server-side against the token, so a token solved elsewhere cannot be reused here. */
+  action: string;
   onToken: (token: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -39,6 +43,7 @@ export function TurnstileField({
       if (cancelled || !host.current || !window.turnstile) return;
       widgetId = window.turnstile.render(host.current, {
         sitekey: siteKey,
+        action,
         callback: (token) => onTokenRef.current(token),
         "expired-callback": () => onTokenRef.current(""),
         "error-callback": () => onTokenRef.current(""),
@@ -66,7 +71,7 @@ export function TurnstileField({
       if (widgetId) window.turnstile?.remove(widgetId);
       onTokenRef.current("");
     };
-  }, [siteKey]);
+  }, [siteKey, action]);
 
   if (!siteKey) return null;
   return <div ref={host} className="min-h-16 shrink-0" />;

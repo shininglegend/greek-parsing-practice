@@ -16,7 +16,8 @@ An educational web application for practicing Koine Greek morphological parsing.
 - Vite and a Cloudflare Worker (static assets plus `/api`)
 - Tailwind CSS for styling
 - D1 for accounts, parse attempts, and the tutor log
-- KV for cached English verses and cached tutor replies
+- KV for cached tutor replies
+- Rate limiting bindings for tutor calls, saved attempts, and sign-in emails
 
 ## Run it locally
 
@@ -52,8 +53,8 @@ The Worker reads two bindings by name. The names are not optional:
 
 | Binding | Resource | What it stores |
 | --- | --- | --- |
-| `DB` | D1 database `greekparser` | Accounts, sessions, attempts, tutor log |
-| `CACHE` | KV namespace | English verses and cached tutor replies |
+| `DB` | D1 database `greekparser` | Accounts, sessions, attempts, tutor log. Guests have no rows; their attempts stay in the browser until they sign in |
+| `CACHE` | KV namespace | Cached tutor replies |
 
 `wrangler d1 migrations apply` takes the **binding** name, `DB`, not the database name.
 
@@ -121,7 +122,7 @@ Then set `EMAIL_FROM` to something like `greek@example.com`. While it is empty, 
 
 Tutor calls go through the `AI` binding and an [AI Gateway](https://developers.cloudflare.com/ai-gateway/get-started/). `AI_GATEWAY_ID` is `greekparser`. A gateway with any name other than `default` has to exist before the first call: in the dashboard, open **AI** > **AI Gateway** and create one named `greekparser`. Only the name `default` is created automatically.
 
-`AI_MODEL` picks the model. A Workers AI id such as `@cf/meta/llama-3.3-70b-instruct-fp8-fast` is billed in Neurons on the account. An Anthropic id such as `anthropic/claude-sonnet-5` or `anthropic/claude-opus-5` uses the same binding and needs [Unified Billing](https://developers.cloudflare.com/ai-gateway/features/unified-billing/) credits loaded on the gateway. Changing `AI_MODEL` and redeploying is the whole switch. Guests and pending accounts cannot call it. Approved accounts share a monthly cap of 20,000 tokens.
+`AI_MODEL` picks the model. A Workers AI id such as `@cf/meta/llama-3.3-70b-instruct-fp8-fast` is billed in Neurons on the account. An Anthropic id such as `anthropic/claude-sonnet-5` or `anthropic/claude-opus-5` uses the same binding and needs [Unified Billing](https://developers.cloudflare.com/ai-gateway/features/unified-billing/) credits loaded on the gateway. Changing `AI_MODEL` and redeploying is the whole switch. Guests and pending accounts cannot call it. Each approved account has a monthly cap of 20,000 tokens. A call is charged before the model runs, at the prompt size plus the full output allowance, then corrected to the reported usage. If the model reports no usage, the charge stands. The `TUTOR_LIMIT` binding also caps one account at 12 calls a minute, so a burst cannot outrun the cap check. Set a spend budget on the AI Gateway as well; it is the backstop when the app is wrong.
 
 Turnstile is optional and guards only the sign-in flow (sending the magic link and confirming it). Tutor calls skip it: an approved, signed-in account is already vetted and token-capped. Set `TURNSTILE_SITE_KEY` in `vars`, then:
 
@@ -154,7 +155,7 @@ npm run cf-typegen
 
 - `src/App.tsx` - Routes for study, reverse parsing, weak spots, and admin
 - `src/signals.ts` - Authored explanations for common misses
-- `worker/` - Session, translations, tutor, and admin API
+- `worker/` - Session, tutor, and admin API
 - `src/api.ts` - MorphGNT verse loading
 - `src/types.ts` - TypeScript definitions for words, verses, and parse fields
 - `src/utils.ts` - Scoring logic and field specifications

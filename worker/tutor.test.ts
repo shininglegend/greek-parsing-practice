@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { explainPrompt, readTutorResult, translationPrompt, tutorRequest } from "./tutor";
+import {
+  explainPrompt,
+  readTutorResult,
+  translationPrompt,
+  tutorBudget,
+  tutorRequest,
+} from "./tutor";
 
 const PROMPT = "Explain ἦν.";
 
@@ -212,5 +218,12 @@ describe("readTutorResult", () => {
         ],
       })
     ).toEqual({ text: "The article agrees.", input: 0, output: 0 });
+  });
+});
+
+describe("tutorBudget", () => {
+  it("charges the prompt and the whole output allowance up front", () => {
+    expect(tutorBudget("a".repeat(300), false)).toEqual({ input: 150, output: 1024 });
+    expect(tutorBudget("a".repeat(301), true)).toEqual({ input: 151, output: 8192 });
   });
 });

@@ -10,6 +10,7 @@ import {
   plainSurface,
   verseSegments,
 } from "../articlePairs";
+import { saveAttempt } from "../attempts";
 import { type LexiconEntry, prefetchLemmas } from "../lexicon";
 import { useSession } from "../session";
 import {
@@ -20,7 +21,7 @@ import {
   foldGreek,
   type SignalExplanation,
 } from "../signals";
-import { ApiError, askTutor, recordAttempt } from "../studyApi";
+import { ApiError, askTutor } from "../studyApi";
 import type { DrillAnswer, ParseFields, Verse, Word } from "../types";
 import {
   celebrateWithConfetti,
@@ -369,14 +370,13 @@ export function VerseSession() {
     }));
     setWhyOpen(false);
     setTutorReply(null);
-    if (!gold || !guess || !verseData || !user) {
-      if (gold && guess && guess !== gold) setMiss({ field, priorMisses: 0 });
-      else setMiss(null);
+    if (!gold || !guess || !verseData) {
+      setMiss(null);
       return;
     }
     const cue = field === "mood" ? findCue(verseData.words, word.parse)?.display : undefined;
     try {
-      const result = await recordAttempt({
+      const result = await saveAttempt(user, {
         verseRef: verseData.ref,
         wordId: word.id,
         surface: word.surface,

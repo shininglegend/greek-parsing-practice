@@ -34,6 +34,8 @@ export type EnglishVersions = {
   asv: string | null;
 };
 
+const memory = new Map<string, Promise<EnglishVersions>>();
+
 function passage(ref: string): string | null {
   const normalized = ref.trim().replace(/(\d)\.(\d+)/, "$1:$2");
   const match = normalized.match(/^(.+)\s+(\d+:\d+)$/);
@@ -42,32 +44,33 @@ function passage(ref: string): string | null {
   return `${book} ${match[2]}`;
 }
 
-async function fetchVersion(passageName: string, translation: string): Promise<string> {
+async function fetchVersion(passageName: string, translation: string): Promise<string | null> {
   const url = `https://bible-api.com/${encodeURIComponent(passageName)}?translation=${translation}`;
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`${translation} ${response.status}`);
+  if (!response.ok) return null;
   const body = (await response.json()) as { text?: string };
-  const text = body.text?.trim();
-  if (!text) throw new Error(`${translation} empty`);
-  return text;
+  return body.text?.trim() || null;
 }
 
-export async function englishVersions(env: Env, ref: string): Promise<EnglishVersions> {
-  const key = `tr:${ref.trim()}`;
-  const cached = await env.CACHE.get(key, "json");
-  if (cached && typeof cached === "object") return cached as EnglishVersions;
-
-  const name = passage(ref);
-  if (!name) throw new Error("Unknown verse reference");
-
-  const [web, kjv, asv] = await Promise.all([
+/**
+ * Public-domain English versions, fetched straight from bible-api.com. The browser
+ * asks the API itself, so the Worker is not a relay anyone can drive.
+ */
+export function englishVersions(ref: string): Promise<EnglishVersions> {
+  const key = ref.trim();
+  const pending = memory.get(key);
+  if (pending) return pending;
+  const name = passage(key);
+  if (!name) return Promise.reject(new Error("Unknown verse reference"));
+  const task = Promise.all([
     fetchVersion(name, "web"),
     fetchVersion(name, "kjv"),
     fetchVersion(name, "asv"),
-  ]);
-  const versions = { web, kjv, asv };
-  await env.CACHE.put(key, JSON.stringify(versions), {
-    expirationTtl: 60 * 60 * 24 * 30,
+  ]).then(([web, kjv, asv]) => {
+    if (!web && !kjv && !asv) throw new Error("The English versions could not be loaded.");
+    return { web, kjv, asv };
   });
-  return versions;
+  task.catch(() => memory.delete(key));
+  memory.set(key, task);
+  return task;
 }
