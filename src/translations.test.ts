@@ -50,7 +50,8 @@ describe("passageName", () => {
   it("expands MorphGNT abbreviations and accepts dotted references", () => {
     expect(passageName("Jn 1:1")).toBe("John 1:1");
     expect(passageName("1Cor 13.4")).toBe("1 Corinthians 13:4");
-    expect(passageName("Genesis 1:1")).toBeNull();
+    expect(passageName("John 1.2")).toBe("John 1:2");
+    expect(passageName("1 Corinthians 13.4")).toBe("1 Corinthians 13:4");
     expect(passageName("Jn 1")).toBeNull();
   });
 });

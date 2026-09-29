@@ -63,13 +63,13 @@ export type VersionStatus =
 
 export type VersionText = VersionInfo & { status: VersionStatus; text: string | null };
 
-/** "Jn 1:1" or "Jn 1.1" → "John 1:1", the form bible-api.com accepts in the path. */
+/** "John 1.2", "Jn 1:1", or "Jn 1.1" → "John 1:2", the form bible-api.com accepts in the path. */
 export function passageName(ref: string): string | null {
   const normalized = ref.trim().replace(/(\d)\.(\d+)$/, "$1:$2");
   const match = normalized.match(/^(.+?)\s+(\d+:\d+)$/);
   if (!match) return null;
-  const book = BOOKS[match[1]];
-  if (!book) return null;
+  // MorphGNT titles already use full names ("John 1.2"); abbreviations are expanded.
+  const book = BOOKS[match[1]] ?? match[1];
   return `${book} ${match[2]}`;
 }
 
