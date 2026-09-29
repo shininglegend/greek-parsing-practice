@@ -107,8 +107,17 @@ const PARAGRAPH_TOKENS = 1024;
 // its trace and ran out before the sections, so the tutor never asks for one.
 const TRANSLATION_TOKENS = 1536;
 
-function replyTokens(kind: TutorKind): number {
-  return kind === "translation" ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS;
+// Claude Sonnet 5 and later, and every Opus, think before answering and cannot be told
+// not to. At low effort the trace is short; this is the room it gets on top of the answer.
+const ANTHROPIC_THINKING_TOKENS = 2048;
+
+function anthropicThinks(model: string): boolean {
+  return model.startsWith("anthropic/") && !model.includes("haiku");
+}
+
+function replyTokens(model: string, kind: TutorKind): number {
+  const answer = kind === "translation" ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS;
+  return anthropicThinks(model) ? answer + ANTHROPIC_THINKING_TOKENS : answer;
 }
 
 /**
@@ -116,10 +125,14 @@ function replyTokens(kind: TutorKind): number {
  * character, so the input side rounds up; the output side is the whole allowance.
  * The row is corrected once real usage arrives. If the model reports none, this stands.
  */
-export function tutorBudget(prompt: string, kind: TutorKind): { input: number; output: number } {
+export function tutorBudget(
+  model: string,
+  prompt: string,
+  kind: TutorKind
+): { input: number; output: number } {
   return {
     input: Math.ceil(prompt.length / 2),
-    output: replyTokens(kind),
+    output: replyTokens(model, kind),
   };
 }
 
@@ -136,11 +149,13 @@ export function tutorRequest(
   kind: TutorKind = "explain"
 ): Record<string, unknown> {
   const system = kind === "translation" ? TRANSLATION_SYSTEM : SYSTEM;
-  const tokens = replyTokens(kind);
+  const tokens = replyTokens(model, kind);
   // Anthropic Messages puts the system prompt beside the messages and requires max_tokens.
+  // Haiku 4.5 rejects output_config, so effort goes only to the models that think.
   if (model.startsWith("anthropic/")) {
     return {
       max_tokens: tokens,
+      ...(anthropicThinks(model) ? { output_config: { effort: "low" } } : {}),
       system,
       messages: [{ role: "user", content: prompt }],
     };
@@ -290,7 +305,7 @@ export async function runTutor(
     return { error: "rate", message: "Too many tutor requests. Wait a minute." };
   }
 
-  const budget = tutorBudget(prompt, kind);
+  const budget = tutorBudget(model, prompt, kind);
   const logId = await logCall(env, user.id, kind, prompt, "", budget.input, budget.output, false);
 
   let result: unknown;

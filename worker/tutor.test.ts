@@ -134,16 +134,19 @@ describe("tutorRequest", () => {
     expect(messages[0]?.content).not.toContain("one short paragraph");
   });
 
-  it("sends Anthropic a system field and a user message", () => {
-    const body = tutorRequest("anthropic/claude-sonnet-5", PROMPT);
+  it("sends Haiku a system field and a user message with no effort setting", () => {
+    const body = tutorRequest("anthropic/claude-haiku-4-5", PROMPT);
     expect(body.system).toEqual(expect.any(String));
     expect(body.max_tokens).toBe(1024);
+    expect(body.output_config).toBeUndefined();
+    expect(body.thinking).toBeUndefined();
     expect(body.messages).toEqual([{ role: "user", content: PROMPT }]);
   });
 
-  it("gives an Anthropic translation review the two-section prompt and allowance", () => {
-    const body = tutorRequest("anthropic/claude-haiku-4-5", PROMPT, "translation");
-    expect(body.max_tokens).toBe(1536);
+  it("gives a thinking Claude model low effort and room for its trace", () => {
+    const body = tutorRequest("anthropic/claude-opus-5-5", PROMPT, "translation");
+    expect(body.max_tokens).toBe(1536 + 2048);
+    expect(body.output_config).toEqual({ effort: "low" });
     expect(body.thinking).toBeUndefined();
     expect(body.system).toContain("What you got wrong");
     expect(body.messages).toEqual([{ role: "user", content: PROMPT }]);
@@ -231,7 +234,22 @@ describe("readTutorResult", () => {
 
 describe("tutorBudget", () => {
   it("charges the prompt and the whole output allowance up front", () => {
-    expect(tutorBudget("a".repeat(300), "explain")).toEqual({ input: 150, output: 1024 });
-    expect(tutorBudget("a".repeat(301), "translation")).toEqual({ input: 151, output: 1536 });
+    const kimi = "@cf/moonshotai/kimi-k2.5";
+    expect(tutorBudget(kimi, "a".repeat(300), "explain")).toEqual({ input: 150, output: 1024 });
+    expect(tutorBudget(kimi, "a".repeat(301), "translation")).toEqual({
+      input: 151,
+      output: 1536,
+    });
+  });
+
+  it("reserves the thinking room a Claude model gets", () => {
+    expect(tutorBudget("anthropic/claude-opus-5-5", "a".repeat(300), "translation")).toEqual({
+      input: 150,
+      output: 1536 + 2048,
+    });
+    expect(tutorBudget("anthropic/claude-haiku-4-5", "a".repeat(300), "translation")).toEqual({
+      input: 150,
+      output: 1536,
+    });
   });
 });
