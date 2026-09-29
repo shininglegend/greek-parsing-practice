@@ -173,6 +173,11 @@ export function VerseSession() {
   const [translateWordIds, setTranslateWordIds] = useState<string[]>([]);
   const [showCompare, setShowCompare] = useState(false);
   const [miss, setMiss] = useState<{ field: keyof ParseFields; priorMisses: number } | null>(null);
+  // Wrong values picked this session, per word and field, so the full-parse tutor note
+  // knows what was corrected. The final answers only ever show the gold parse.
+  const [wrongGuesses, setWrongGuesses] = useState<
+    Record<string, Partial<Record<keyof ParseFields, string[]>>>
+  >({});
   const [whyOpen, setWhyOpen] = useState(false);
   const [definitionWord, setDefinitionWord] = useState<Word | null>(null);
   const [glossWordId, setGlossWordId] = useState<string | null>(null);
@@ -188,6 +193,7 @@ export function VerseSession() {
     const formatted = formatRef(book, chap, verse);
     setState({ kind: "loading", ref: formatted });
     setMiss(null);
+    setWrongGuesses({});
     setWhyOpen(false);
     setTutorReply(null);
     confettiTriggered.current = false;
@@ -374,6 +380,13 @@ export function VerseSession() {
       setMiss(null);
       return;
     }
+    if (guess !== gold) {
+      setWrongGuesses((prev) => {
+        const tried = prev[word.id]?.[field] ?? [];
+        if (tried.includes(guess)) return prev;
+        return { ...prev, [word.id]: { ...prev[word.id], [field]: [...tried, guess] } };
+      });
+    }
     const cue = field === "mood" ? findCue(verseData.words, word.parse)?.display : undefined;
     try {
       const result = await saveAttempt(user, {
@@ -403,7 +416,19 @@ export function VerseSession() {
   async function explainWhole() {
     if (!active || !verseData || correctNotes.length === 0) return;
     const parse = correctNotes.map((item) => item.title).join("; ");
-    await askAbout(correctNotes, { gold: parse, guess: parse, whole: true });
+    const tried = wrongGuesses[active.id] ?? {};
+    const corrected = PARSE_KEYS.flatMap((key) => {
+      const gold = normalizeMissing(active.parse?.[key]);
+      const wrong = tried[key];
+      if (!gold || !wrong || wrong.length === 0) return [];
+      return [`${key}: tried ${wrong.join(", then ")} before ${gold}`];
+    });
+    await askAbout(correctNotes, {
+      gold: parse,
+      guess:
+        corrected.length > 0 ? corrected.join("; ") : "none, every field right on the first try",
+      whole: true,
+    });
   }
 
   async function askAbout(

@@ -47,6 +47,9 @@ describe("explainPrompt", () => {
     expect(prompt).toContain("Verse parses:");
     expect(prompt).toContain("Address the student as you. Write one short paragraph.");
     expect(prompt).toContain("Explain the morphological reason the gold parse has these values");
+    expect(prompt).toContain("Wrong guesses before correcting:");
+    expect(prompt).toContain("do not congratulate them on it");
+    expect(prompt).not.toContain("Student chose:");
     expect(prompt).toContain("agreement with a nearby word (use the verse parses)");
     expect(prompt).not.toContain("how these fields work together");
     expect(prompt).toContain("Do not define the grammatical categories");

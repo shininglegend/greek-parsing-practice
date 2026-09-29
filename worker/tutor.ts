@@ -39,6 +39,11 @@ export function explainPrompt(body: Record<string, unknown>): string | null {
   const task = body.whole
     ? [
         "Address the student as you. Write one short paragraph.",
+        "The gold parse is the answer the student reached after correcting their mistakes;",
+        "it is not their own guess, so do not congratulate them on it.",
+        "If wrong guesses are listed, start there: for each one, say why that value does not fit",
+        "this form and which cue points to the gold value instead.",
+        "If none are listed, do not praise; go straight to the explanation.",
         "Explain the morphological reason the gold parse has these values:",
         "endings, agreement with a nearby word (use the verse parses), an irregular lemma, or other cues.",
         "Do not define the grammatical categories, and do not say what nominative, singular, masculine,",
@@ -64,7 +69,7 @@ export function explainPrompt(body: Record<string, unknown>): string | null {
     `Verse: ${verseRef}`,
     `Word: ${surface} (lemma ${lemma})`,
     `Gold parse: ${gold}`,
-    `Student chose: ${guess}`,
+    body.whole ? `Wrong guesses before correcting: ${guess}` : `Student chose: ${guess}`,
     `Verse parses: ${verseParses}`,
     `Signal card: ${signal}`,
     task,
@@ -311,7 +316,12 @@ export async function runTutor(
   let result: unknown;
   try {
     result = await env.AI.run(model, tutorRequest(model, prompt, kind), {
-      gateway: { id: env.AI_GATEWAY_ID || "default" },
+      gateway: {
+        id: env.AI_GATEWAY_ID || "default",
+        // Shows up on the gateway log so a call can be traced to an account and an ai_log row.
+        eventId: logId,
+        metadata: { user: user.id, kind, role: user.role },
+      },
     });
   } catch (error) {
     console.error(error);
