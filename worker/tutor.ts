@@ -100,19 +100,26 @@ export function translationPrompt(body: Record<string, unknown>): string | null 
   ].join("\n");
 }
 
+export type TutorKind = "explain" | "translation";
+
 const PARAGRAPH_TOKENS = 1024;
-// Room for a reasoning trace plus the finished paragraph.
-const TRANSLATION_TOKENS = 8192;
+// Two short sections. No reasoning trace: a thinking model spent this allowance on
+// its trace and ran out before the sections, so the tutor never asks for one.
+const TRANSLATION_TOKENS = 1536;
+
+function replyTokens(kind: TutorKind): number {
+  return kind === "translation" ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS;
+}
 
 /**
  * Tokens charged before the model answers. Greek tokenizes close to one token per
  * character, so the input side rounds up; the output side is the whole allowance.
  * The row is corrected once real usage arrives. If the model reports none, this stands.
  */
-export function tutorBudget(prompt: string, think: boolean): { input: number; output: number } {
+export function tutorBudget(prompt: string, kind: TutorKind): { input: number; output: number } {
   return {
     input: Math.ceil(prompt.length / 2),
-    output: think ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS,
+    output: replyTokens(kind),
   };
 }
 
@@ -126,13 +133,14 @@ type Usage = {
 export function tutorRequest(
   model: string,
   prompt: string,
-  think = false
+  kind: TutorKind = "explain"
 ): Record<string, unknown> {
-  const system = think ? TRANSLATION_SYSTEM : SYSTEM;
+  const system = kind === "translation" ? TRANSLATION_SYSTEM : SYSTEM;
+  const tokens = replyTokens(kind);
   // Anthropic Messages puts the system prompt beside the messages and requires max_tokens.
   if (model.startsWith("anthropic/")) {
     return {
-      max_tokens: think ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS,
+      max_tokens: tokens,
       system,
       messages: [{ role: "user", content: prompt }],
     };
@@ -141,15 +149,13 @@ export function tutorRequest(
     { role: "system", content: system },
     { role: "user", content: prompt },
   ];
-  const tokens = think ? TRANSLATION_TOKENS : PARAGRAPH_TOKENS;
+  // Kimi reasons by default. Its trace counts against max_tokens, so it stays off.
   if (model.includes("kimi-")) {
     return {
       max_tokens: tokens,
       max_completion_tokens: tokens,
-      thinking: { type: think ? "enabled" : "disabled" },
-      chat_template_kwargs: think
-        ? { enable_thinking: true, thinking: true }
-        : { enable_thinking: false, thinking: false },
+      thinking: { type: "disabled" },
+      chat_template_kwargs: { enable_thinking: false, thinking: false },
       messages,
     };
   }
@@ -256,13 +262,12 @@ async function logCall(
 export async function runTutor(
   env: Env,
   user: UserRow,
-  kind: "explain" | "translation",
+  kind: TutorKind,
   prompt: string
 ): Promise<{ reply: string } | { error: "cap" | "rate" | "model"; message: string }> {
   const model: string = kind === "translation" ? env.AI_TRANSLATION_MODEL : env.AI_MODEL;
-  const think = kind === "translation";
-  // v2 drops replies cached while Kimi was still spending the token cap on a reasoning trace.
-  const cacheKey = `ai:${await sha256(`v2\n${model}\n${kind}\n${prompt}`)}`;
+  // v3 drops replies cached while a model was spending the token cap on a reasoning trace.
+  const cacheKey = `ai:${await sha256(`v3\n${model}\n${kind}\n${prompt}`)}`;
   const cached = await env.CACHE.get(cacheKey);
   if (cached) {
     await logCall(env, user.id, kind, prompt, cached, 0, 0, true);
@@ -285,12 +290,12 @@ export async function runTutor(
     return { error: "rate", message: "Too many tutor requests. Wait a minute." };
   }
 
-  const budget = tutorBudget(prompt, think);
+  const budget = tutorBudget(prompt, kind);
   const logId = await logCall(env, user.id, kind, prompt, "", budget.input, budget.output, false);
 
   let result: unknown;
   try {
-    result = await env.AI.run(model, tutorRequest(model, prompt, think), {
+    result = await env.AI.run(model, tutorRequest(model, prompt, kind), {
       gateway: { id: env.AI_GATEWAY_ID || "default" },
     });
   } catch (error) {

@@ -122,12 +122,12 @@ describe("tutorRequest", () => {
     expect(body.chat_template_kwargs).toEqual({ enable_thinking: false, thinking: false });
   });
 
-  it("lets a translation model think and leaves room for the paragraph", () => {
-    const body = tutorRequest("@cf/moonshotai/kimi-k2.6", PROMPT, true);
-    expect(body.max_tokens).toBe(8192);
-    expect(body.max_completion_tokens).toBe(8192);
-    expect(body.thinking).toEqual({ type: "enabled" });
-    expect(body.chat_template_kwargs).toEqual({ enable_thinking: true, thinking: true });
+  it("keeps a translation review out of reasoning mode and leaves room for two sections", () => {
+    const body = tutorRequest("@cf/moonshotai/kimi-k2.5", PROMPT, "translation");
+    expect(body.max_tokens).toBe(1536);
+    expect(body.max_completion_tokens).toBe(1536);
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.chat_template_kwargs).toEqual({ enable_thinking: false, thinking: false });
     const messages = body.messages as { role: string; content: string }[];
     expect(messages[0]?.content).toContain("What you got wrong");
     expect(messages[0]?.content).toContain("What you got right");
@@ -138,6 +138,14 @@ describe("tutorRequest", () => {
     const body = tutorRequest("anthropic/claude-sonnet-5", PROMPT);
     expect(body.system).toEqual(expect.any(String));
     expect(body.max_tokens).toBe(1024);
+    expect(body.messages).toEqual([{ role: "user", content: PROMPT }]);
+  });
+
+  it("gives an Anthropic translation review the two-section prompt and allowance", () => {
+    const body = tutorRequest("anthropic/claude-haiku-4-5", PROMPT, "translation");
+    expect(body.max_tokens).toBe(1536);
+    expect(body.thinking).toBeUndefined();
+    expect(body.system).toContain("What you got wrong");
     expect(body.messages).toEqual([{ role: "user", content: PROMPT }]);
   });
 });
@@ -223,7 +231,7 @@ describe("readTutorResult", () => {
 
 describe("tutorBudget", () => {
   it("charges the prompt and the whole output allowance up front", () => {
-    expect(tutorBudget("a".repeat(300), false)).toEqual({ input: 150, output: 1024 });
-    expect(tutorBudget("a".repeat(301), true)).toEqual({ input: 151, output: 8192 });
+    expect(tutorBudget("a".repeat(300), "explain")).toEqual({ input: 150, output: 1024 });
+    expect(tutorBudget("a".repeat(301), "translation")).toEqual({ input: 151, output: 1536 });
   });
 });

@@ -11,7 +11,7 @@ interface __BaseEnv_Env {
 	AI: Ai;
 	ASSETS: Fetcher;
 	AI_MODEL: "@cf/moonshotai/kimi-k2.5";
-	AI_TRANSLATION_MODEL: "@cf/moonshotai/kimi-k2.6";
+	AI_TRANSLATION_MODEL: "@cf/moonshotai/kimi-k2.5";
 	AI_GATEWAY_ID: "greekparser";
 	EMAIL_FROM: "accounts@greek.titusmurphy.com";
 	TURNSTILE_SITE_KEY: "0x4AAAAAAFAH8JAA0hXpKQry";
