@@ -3,7 +3,7 @@ import { articlePairs, verseSegments } from "../articlePairs";
 import { buildChecklist } from "../checklist";
 import { useSession } from "../session";
 import { ApiError, askTutor } from "../studyApi";
-import { type EnglishVersions, englishVersions } from "../translations";
+import { type VersionText, versionsForTutor, versionTexts, watchVersions } from "../translations";
 import { splitTutorNote } from "../tutorNote";
 import type { Verse, Word } from "../types";
 import { FIELD_SPECS, normalizeMissing } from "../utils";
@@ -156,8 +156,7 @@ export function TranslateStep({
   onShowCompare: (show: boolean) => void;
 }) {
   const { user } = useSession();
-  const [versions, setVersions] = useState<EnglishVersions | null>(null);
-  const [versionError, setVersionError] = useState<string | null>(null);
+  const [versions, setVersions] = useState<VersionText[]>(() => versionTexts(verse.ref));
   const [note, setNote] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [noteLoading, setNoteLoading] = useState(false);
@@ -194,25 +193,18 @@ export function TranslateStep({
   }, [openWordId]);
 
   useEffect(() => {
-    let cancelled = false;
-    englishVersions(verse.ref)
-      .then((data) => {
-        if (!cancelled) setVersions(data);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setVersionError(
-            error instanceof Error ? error.message : "Could not load English versions."
-          );
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
+    const update = () => setVersions(versionTexts(verse.ref));
+    update();
+    return watchVersions(verse.ref, update);
   }, [verse.ref]);
 
+  const hasVersion = versions.some((version) => version.status === "ready");
+  const allSettled = versions.every(
+    (version) => version.status === "ready" || version.status === "missing"
+  );
+
   async function requestNote() {
-    if (!approved || !versions || chosen.length === 0) return;
+    if (!approved || !hasVersion || chosen.length === 0) return;
     setNoteLoading(true);
     setNote(null);
     setNoteError(null);
@@ -225,12 +217,7 @@ export function TranslateStep({
         checklist:
           checklist.map((line) => line.text).join("\n") ||
           "No parse is recorded for the words the student chose.",
-        versions: ["WEB", "KJV", "ASV"]
-          .map((name) => {
-            const key = name.toLowerCase() as keyof EnglishVersions;
-            return `${name}: ${versions[key] ?? "unavailable"}`;
-          })
-          .join("\n"),
+        versions: versionsForTutor(versions),
       });
       setNote(result.reply);
     } catch (error) {
@@ -333,7 +320,7 @@ export function TranslateStep({
               <button
                 type="button"
                 className="btn"
-                disabled={noteLoading || !english.trim() || chosen.length === 0}
+                disabled={noteLoading || !hasVersion || !english.trim() || chosen.length === 0}
                 onClick={requestNote}
               >
                 {noteLoading ? "Asking…" : "Ask about my English and the parse"}
@@ -349,15 +336,28 @@ export function TranslateStep({
             )}
           </div>
           <div className="space-y-2">
-            {versionError && <p className="text-sm text-red-700">{versionError}</p>}
-            {(["web", "kjv", "asv"] as const).map((key) => (
-              <div key={key} className="card">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {key}
+            {allSettled && !hasVersion && (
+              <p className="text-sm text-red-700">The English versions could not be loaded.</p>
+            )}
+            {versions
+              .filter((version) => version.status !== "missing")
+              .map((version) => (
+                <div key={version.id} className="card">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {version.label}
+                    </span>
+                    <span className="text-xs text-slate-400">{version.name}</span>
+                  </div>
+                  {version.status === "ready" ? (
+                    <p className="mt-1">{version.text}</p>
+                  ) : (
+                    <p className="mt-1 text-sm text-slate-500">
+                      {version.status === "waiting" ? "Waiting on the rate limit…" : "Loading…"}
+                    </p>
+                  )}
                 </div>
-                <p className="mt-1">{versions?.[key] ?? "Loading…"}</p>
-              </div>
-            ))}
+              ))}
           </div>
           <div className="card space-y-2">
             <div className="font-semibold">What the parse commits you to</div>

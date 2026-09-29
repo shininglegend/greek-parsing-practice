@@ -5,7 +5,7 @@ An educational web application for practicing Koine Greek morphological parsing.
 ## Features
 
 - Parse one word at a time. A miss explains the contrast, a cue in the verse when there is one, and what that parse does in English
-- After the verse is parsed, write an English rendering and compare a gloss line, a parse checklist, and WEB, KJV, and ASV
+- After the verse is parsed, write an English rendering and compare a gloss line, a parse checklist, and nine public-domain English versions from bible-api.com
 - Weak spots count repeated misses
 - An approved account can ask for a longer tutor note. Every query and reply is stored for `/admin`
 - MorphGNT is the grader. The model never overrides a parse
@@ -158,7 +158,7 @@ npm run cf-typegen
 
 1. Load a verse and tap one word at a time
 2. Choose its grammatical features. A miss shows why: the contrast, a cue in the verse when there is one, and what that parse does in English
-3. When the selected words are answered, write an English rendering and compare a gloss line, a parse checklist, and WEB, KJV, and ASV
+3. When the selected words are answered, write an English rendering and compare a gloss line, a parse checklist, and nine public-domain English versions from bible-api.com
 4. Weak spots count repeated misses. An approved account can ask for a longer tutor note; every query and reply is stored for the admin dashboard
 
 ## Project Structure
