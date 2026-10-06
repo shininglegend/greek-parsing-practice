@@ -268,36 +268,125 @@ async function route(request: Request, env: Env, url: URL): Promise<Response> {
     const { user, denied } = await requireAccount(request, env);
     if (denied) return denied;
     const session = { user, cookies: [] as string[] };
-    const groups = await env.DB.prepare(
-      `SELECT field, gold,
-              SUM(CASE WHEN guess != gold THEN 1 ELSE 0 END) AS misses,
-              COUNT(*) AS total
-       FROM attempts
-       WHERE user_id = ?
-       GROUP BY field, gold
-       ORDER BY misses DESC
-       LIMIT 40`
+    const rows = await env.DB.prepare(
+      `WITH grouped AS (
+         SELECT field, gold,
+                SUM(CASE WHEN guess != gold THEN 1 ELSE 0 END) AS misses,
+                COUNT(*) AS total
+         FROM attempts
+         WHERE user_id = ?
+         GROUP BY field, gold
+         HAVING SUM(CASE WHEN guess != gold THEN 1 ELSE 0 END) > 0
+         ORDER BY misses DESC
+         LIMIT 40
+       ),
+       word_latest AS (
+         SELECT a.field, a.gold, a.verse_ref, a.word_id, MAX(a.created_at) AS latest
+         FROM attempts a
+         JOIN grouped g ON g.field = a.field AND g.gold = a.gold
+         WHERE a.user_id = ? AND a.guess != a.gold
+         GROUP BY a.field, a.gold, a.verse_ref, a.word_id
+       ),
+       ranked_words AS (
+         SELECT field, gold, verse_ref, word_id, latest,
+                ROW_NUMBER() OVER (PARTITION BY field, gold ORDER BY latest DESC) AS n
+         FROM word_latest
+       ),
+       guesses AS (
+         SELECT a.field, a.gold, a.verse_ref, a.word_id, a.guess,
+                COUNT(*) AS guess_count,
+                MAX(a.created_at) AS guess_latest
+         FROM attempts a
+         JOIN ranked_words w
+           ON w.field = a.field AND w.gold = a.gold
+          AND w.verse_ref = a.verse_ref AND w.word_id = a.word_id AND w.n <= 5
+         WHERE a.user_id = ? AND a.guess != a.gold
+         GROUP BY a.field, a.gold, a.verse_ref, a.word_id, a.guess
+       ),
+       detail AS (
+         SELECT a.field, a.gold, a.verse_ref, a.word_id, a.surface, a.lemma, a.cue,
+                ROW_NUMBER() OVER (
+                  PARTITION BY a.field, a.gold, a.verse_ref, a.word_id
+                  ORDER BY a.created_at DESC
+                ) AS dup
+         FROM attempts a
+         JOIN ranked_words w
+           ON w.field = a.field AND w.gold = a.gold
+          AND w.verse_ref = a.verse_ref AND w.word_id = a.word_id AND w.n <= 5
+         WHERE a.user_id = ? AND a.guess != a.gold
+       )
+       SELECT g.field, g.gold, g.misses, g.total,
+              q.verse_ref, q.word_id, d.surface, d.lemma, d.cue,
+              q.guess, q.guess_count
+       FROM grouped g
+       LEFT JOIN ranked_words w ON w.field = g.field AND w.gold = g.gold AND w.n <= 5
+       LEFT JOIN guesses q
+         ON q.field = w.field AND q.gold = w.gold
+        AND q.verse_ref = w.verse_ref AND q.word_id = w.word_id
+       LEFT JOIN detail d
+         ON d.field = w.field AND d.gold = w.gold
+        AND d.verse_ref = w.verse_ref AND d.word_id = w.word_id AND d.dup = 1
+       ORDER BY g.misses DESC, w.latest DESC, q.guess_count DESC, q.guess_latest DESC`
     )
-      .bind(session.user.id)
-      .all<{ field: string; gold: string; misses: number; total: number }>();
+      .bind(session.user.id, session.user.id, session.user.id, session.user.id)
+      .all<{
+        field: string;
+        gold: string;
+        misses: number;
+        total: number;
+        verse_ref: string | null;
+        word_id: string | null;
+        surface: string | null;
+        lemma: string | null;
+        cue: string | null;
+        guess: string | null;
+        guess_count: number | null;
+      }>();
 
-    const spots = [];
-    for (const row of groups.results) {
-      if (Number(row.misses) <= 0) continue;
-      const sample = await env.DB.prepare(
-        `SELECT verse_ref FROM attempts
-         WHERE user_id = ? AND field = ? AND gold = ? AND guess != gold
-         ORDER BY created_at DESC LIMIT 1`
-      )
-        .bind(session.user.id, row.field, row.gold)
-        .first<{ verse_ref: string }>();
-      spots.push({
-        field: row.field,
-        gold: row.gold,
-        misses: Number(row.misses),
-        total: Number(row.total),
-        verseRef: sample?.verse_ref ?? null,
-      });
+    const spots: {
+      field: string;
+      gold: string;
+      misses: number;
+      total: number;
+      recent: {
+        verseRef: string;
+        surface: string | null;
+        lemma: string | null;
+        cue: string | null;
+        guesses: { guess: string; count: number }[];
+      }[];
+    }[] = [];
+    const byKey = new Map<string, (typeof spots)[number]>();
+    const byWord = new Map<string, (typeof spots)[number]["recent"][number]>();
+    for (const row of rows.results) {
+      const key = `${row.field}\n${row.gold}`;
+      let spot = byKey.get(key);
+      if (!spot) {
+        spot = {
+          field: row.field,
+          gold: row.gold,
+          misses: Number(row.misses),
+          total: Number(row.total),
+          recent: [],
+        };
+        byKey.set(key, spot);
+        spots.push(spot);
+      }
+      if (!row.verse_ref || !row.word_id || !row.guess) continue;
+      const wordKey = `${key}\n${row.verse_ref}\n${row.word_id}`;
+      let entry = byWord.get(wordKey);
+      if (!entry) {
+        entry = {
+          verseRef: row.verse_ref,
+          surface: row.surface,
+          lemma: row.lemma,
+          cue: row.cue,
+          guesses: [],
+        };
+        byWord.set(wordKey, entry);
+        spot.recent.push(entry);
+      }
+      entry.guesses.push({ guess: row.guess, count: Number(row.guess_count) });
     }
     return json({ spots }, { cookies: session.cookies });
   }

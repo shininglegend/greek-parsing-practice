@@ -6,12 +6,27 @@ export type SessionUser = {
   tokenCap: number;
 };
 
+export type RecentGuess = {
+  guess: string;
+  count: number;
+};
+
+export type RecentMiss = {
+  verseRef: string;
+  surface: string | null;
+  lemma: string | null;
+  cue: string | null;
+  /** Wrong answers for this verse and word, most frequent first. */
+  guesses: RecentGuess[];
+};
+
 export type WeakSpot = {
   field: string;
   gold: string;
   misses: number;
   total: number;
-  verseRef: string | null;
+  /** Newest distinct misses for this form, at most five. */
+  recent: RecentMiss[];
 };
 
 export class ApiError extends Error {
