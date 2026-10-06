@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { articlePairs, verseSegments } from "../articlePairs";
 import { buildChecklist } from "../checklist";
 import { useSession } from "../session";
@@ -16,6 +16,42 @@ import {
 import { splitTutorNote } from "../tutorNote";
 import type { Verse, Word } from "../types";
 import { FIELD_SPECS, normalizeMissing } from "../utils";
+
+function growTextarea(element: HTMLTextAreaElement) {
+  element.style.height = "0px";
+  const border = element.offsetHeight - element.clientHeight;
+  element.style.height = `${element.scrollHeight + border}px`;
+}
+
+function useGrowingTextarea() {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    // Current browsers grow the field from the stylesheet. Older mobile Safari does not.
+    if (!element || CSS.supports("field-sizing", "content")) return;
+    growTextarea(element);
+  });
+
+  useEffect(() => {
+    const element = ref.current;
+    const parent = element?.parentElement;
+    if (!element || !parent || CSS.supports("field-sizing", "content")) return;
+    let width = parent.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (parent.clientWidth === width) return;
+      width = parent.clientWidth;
+      growTextarea(element);
+    });
+    observer.observe(parent);
+    return () => {
+      observer.disconnect();
+      element.style.height = "";
+    };
+  }, []);
+
+  return ref;
+}
 
 function TutorWait() {
   const [progress, setProgress] = useState(6);
@@ -183,6 +219,7 @@ export function TranslateStep({
   const approved = user?.status === "approved" || user?.role === "admin";
   const [openWordId, setOpenWordId] = useState<string | null>(null);
   const wordRowRef = useRef<HTMLDivElement>(null);
+  const englishRef = useGrowingTextarea();
 
   function toggleChosen(id: string) {
     const next = new Set(translateWordIds);
@@ -304,7 +341,8 @@ export function TranslateStep({
           })}
         </div>
         <textarea
-          className="input w-full min-h-28"
+          ref={englishRef}
+          className="input w-full"
           value={english}
           onChange={(event) => onEnglish(event.target.value)}
           placeholder="Your English"

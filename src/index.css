@@ -26,6 +26,16 @@ html {
 .input {
   @apply min-h-11 px-3 py-2 rounded-sm border;
 }
+textarea.input {
+  field-sizing: content;
+  min-height: 7rem;
+  resize: none;
+}
+@supports (field-sizing: content) {
+  textarea.input {
+    overflow-y: hidden;
+  }
+}
 .select {
   @apply min-h-11 px-2 py-1 rounded-sm border bg-white;
 }
