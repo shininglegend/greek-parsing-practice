@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   explainPrompt,
+  loggedFailure,
   readTutorResult,
   translationPrompt,
   tutorBudget,
@@ -232,6 +233,46 @@ describe("readTutorResult", () => {
         ],
       })
     ).toEqual({ text: "The article agrees.", input: 0, output: 0 });
+  });
+});
+
+describe("loggedFailure", () => {
+  it("keeps the error name, message, stack, and extra fields", () => {
+    const error = new Error("gateway rejected the call", { cause: new Error("402") });
+    error.name = "AiError";
+    (error as Error & { status: number }).status = 402;
+    const text = loggedFailure("error", error);
+    expect(text.startsWith("Model error:\n")).toBe(true);
+    const record = JSON.parse(text.slice("Model error:\n".length)) as {
+      name: string;
+      message: string;
+      stack: string;
+      status: number;
+      cause: { message: string };
+    };
+    expect(record.name).toBe("AiError");
+    expect(record.message).toBe("gateway rejected the call");
+    expect(record.stack).toContain("AiError");
+    expect(record.status).toBe(402);
+    expect(record.cause.message).toBe("402");
+  });
+
+  it("stores the raw model payload when the answer is empty", () => {
+    const text = loggedFailure("empty", {
+      content: [{ type: "thinking", thinking: "still working" }],
+      usage: { input_tokens: 12, output_tokens: 400 },
+    });
+    expect(text.startsWith("Empty model response:\n")).toBe(true);
+    expect(JSON.parse(text.slice("Empty model response:\n".length))).toEqual({
+      content: [{ type: "thinking", thinking: "still working" }],
+      usage: { input_tokens: 12, output_tokens: 400 },
+    });
+  });
+
+  it("truncates a payload that would not fit in a D1 statement", () => {
+    const text = loggedFailure("empty", "x".repeat(90_000));
+    expect(text.endsWith("\n…[truncated]")).toBe(true);
+    expect(text.length).toBeLessThan(90_000);
   });
 });
 

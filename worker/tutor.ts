@@ -237,6 +237,45 @@ export function readTutorResult(result: unknown): { text: string; input: number;
   };
 }
 
+// D1 rejects a SQL statement over 100 KB. The prompt is already stored, so the reply
+// update has to stay under that on its own.
+const LOG_TEXT_LIMIT = 80_000;
+
+function dump(value: unknown): string {
+  const seen = new WeakSet<object>();
+  try {
+    const json = JSON.stringify(value, (_key, item: unknown) => {
+      if (typeof item === "bigint") return item.toString();
+      if (item instanceof Error) {
+        if (seen.has(item)) return "[circular]";
+        seen.add(item);
+        const record: Record<string, unknown> = {};
+        for (const key of Object.getOwnPropertyNames(item)) {
+          record[key] = (item as unknown as Record<string, unknown>)[key];
+        }
+        return record;
+      }
+      if (item && typeof item === "object") {
+        if (seen.has(item)) return "[circular]";
+        seen.add(item);
+      }
+      return item;
+    });
+    return json ?? String(value);
+  } catch (error) {
+    return error instanceof Error ? error.message : String(value);
+  }
+}
+
+/** Full failure text stored on the ai_log row. Shown in /admin. */
+export function loggedFailure(kind: "error" | "empty", detail: unknown): string {
+  const heading = kind === "error" ? "Model error:" : "Empty model response:";
+  const body = dump(detail);
+  const text =
+    body.length > LOG_TEXT_LIMIT ? `${body.slice(0, LOG_TEXT_LIMIT)}\n…[truncated]` : body;
+  return `${heading}\n${text}`;
+}
+
 async function tokensUsed(env: Env, userId: string): Promise<number> {
   const row = await env.DB.prepare(
     `SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS n
@@ -277,6 +316,20 @@ async function logCall(
     )
     .run();
   return id;
+}
+
+async function finishLog(
+  env: Env,
+  logId: string,
+  reply: string,
+  input: number,
+  output: number
+): Promise<void> {
+  await env.DB.prepare(
+    "UPDATE ai_log SET reply = ?, input_tokens = ?, output_tokens = ? WHERE id = ?"
+  )
+    .bind(reply, input, output, logId)
+    .run();
 }
 
 export async function runTutor(
@@ -325,27 +378,21 @@ export async function runTutor(
     });
   } catch (error) {
     console.error(error);
-    await env.DB.prepare("DELETE FROM ai_log WHERE id = ?").bind(logId).run();
+    // No usage came back, so the reservation stands. The row stays so /admin has the error.
+    await finishLog(env, logId, loggedFailure("error", error), budget.input, budget.output);
     return { error: "model", message: "The tutor could not answer just now." };
   }
 
   const read = readTutorResult(result);
-  if (!read.text) {
-    await env.DB.prepare("DELETE FROM ai_log WHERE id = ?").bind(logId).run();
-    return { error: "model", message: "The tutor returned an empty answer." };
-  }
   // Keep the reservation when the model reports no usage, so an unmetered reply still counts.
   const reported = read.input > 0 || read.output > 0;
-  await env.DB.prepare(
-    "UPDATE ai_log SET reply = ?, input_tokens = ?, output_tokens = ? WHERE id = ?"
-  )
-    .bind(
-      read.text,
-      reported ? read.input : budget.input,
-      reported ? read.output : budget.output,
-      logId
-    )
-    .run();
+  const input = reported ? read.input : budget.input;
+  const output = reported ? read.output : budget.output;
+  if (!read.text) {
+    await finishLog(env, logId, loggedFailure("empty", result), input, output);
+    return { error: "model", message: "The tutor returned an empty answer." };
+  }
+  await finishLog(env, logId, read.text, input, output);
   await env.CACHE.put(cacheKey, read.text, { expirationTtl: 60 * 60 * 24 * 14 });
   return { reply: read.text };
 }
