@@ -3,7 +3,16 @@ import { articlePairs, verseSegments } from "../articlePairs";
 import { buildChecklist } from "../checklist";
 import { useSession } from "../session";
 import { ApiError, askTutor } from "../studyApi";
-import { type VersionText, versionsForTutor, versionTexts, watchVersions } from "../translations";
+import {
+  defaultVersionIds,
+  MAX_SELECTED_VERSIONS,
+  toggleVersion,
+  VERSIONS,
+  type VersionText,
+  versionsForTutor,
+  versionTexts,
+  watchVersions,
+} from "../translations";
 import { splitTutorNote } from "../tutorNote";
 import type { Verse, Word } from "../types";
 import { FIELD_SPECS, normalizeMissing } from "../utils";
@@ -157,6 +166,7 @@ export function TranslateStep({
 }) {
   const { user } = useSession();
   const [versions, setVersions] = useState<VersionText[]>(() => versionTexts(verse.ref));
+  const [selectedIds, setSelectedIds] = useState<string[]>(defaultVersionIds);
   const [note, setNote] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [noteLoading, setNoteLoading] = useState(false);
@@ -195,11 +205,12 @@ export function TranslateStep({
   useEffect(() => {
     const update = () => setVersions(versionTexts(verse.ref));
     update();
-    return watchVersions(verse.ref, update);
-  }, [verse.ref]);
+    return watchVersions(verse.ref, update, selectedIds);
+  }, [verse.ref, selectedIds]);
 
-  const hasVersion = versions.some((version) => version.status === "ready");
-  const allSettled = versions.every(
+  const shown = versions.filter((version) => selectedIds.includes(version.id));
+  const hasVersion = shown.some((version) => version.status === "ready");
+  const allSettled = shown.every(
     (version) => version.status === "ready" || version.status === "missing"
   );
 
@@ -217,7 +228,7 @@ export function TranslateStep({
         checklist:
           checklist.map((line) => line.text).join("\n") ||
           "No parse is recorded for the words the student chose.",
-        versions: versionsForTutor(versions),
+        versions: versionsForTutor(shown),
       });
       setNote(result.reply);
     } catch (error) {
@@ -302,6 +313,27 @@ export function TranslateStep({
           <button type="button" className="btn" onClick={() => onShowCompare(true)}>
             Compare
           </button>
+          {VERSIONS.map((version) => {
+            const selected = selectedIds.includes(version.id);
+            const capped = !selected && selectedIds.length >= MAX_SELECTED_VERSIONS;
+            return (
+              <button
+                key={version.id}
+                type="button"
+                title={capped ? `${version.name}. Choose at most 5.` : version.name}
+                aria-pressed={selected}
+                disabled={capped}
+                className={`rounded-sm border px-2 py-1 text-xs ${
+                  selected
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                } disabled:opacity-40`}
+                onClick={() => setSelectedIds((current) => toggleVersion(current, version.id))}
+              >
+                {version.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -339,7 +371,7 @@ export function TranslateStep({
             {allSettled && !hasVersion && (
               <p className="text-sm text-red-700">The English versions could not be loaded.</p>
             )}
-            {versions
+            {shown
               .filter((version) => version.status !== "missing")
               .map((version) => (
                 <div key={version.id} className="card">

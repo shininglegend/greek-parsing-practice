@@ -19,9 +19,9 @@ export function Help() {
             Tap a word in the verse, then choose its grammatical features. A miss opens a signal
             card: the contrast, the cue in the verse when there is one, and what that parse does in
             English. When every selected word has an answer, write an English rendering and compare
-            it with a gloss line, a parse checklist, and nine public-domain English versions. The
-            app does not grade your English. A longer tutor note is available only on an approved
-            account.
+            it with a gloss line, a parse checklist, and up to five of ten public-domain English
+            versions. The app does not grade your English. A longer tutor note is available only on
+            an approved account.
           </p>
         </section>
 

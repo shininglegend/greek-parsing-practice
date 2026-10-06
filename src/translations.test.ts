@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   createScheduler,
+  defaultVersionIds,
+  MAX_SELECTED_VERSIONS,
   passageName,
   RATE_LIMIT,
+  toggleVersion,
+  VERSIONS,
   type VersionText,
   versionsForTutor,
 } from "./translations";
@@ -45,6 +49,32 @@ function fill(sched: ReturnType<typeof createScheduler>, count: number, owner = 
   }
   return changes;
 }
+
+describe("version selection", () => {
+  it("orders versions from literal to interpretive and starts with five", () => {
+    expect(VERSIONS.map((version) => version.id)).toEqual([
+      "ylt",
+      "darby",
+      "asv",
+      "kjv",
+      "dra",
+      "web",
+      "webbe",
+      "oeb-us",
+      "oeb-cw",
+      "bbe",
+    ]);
+    expect(defaultVersionIds()).toEqual(["ylt", "darby", "asv", "kjv", "dra"]);
+    expect(defaultVersionIds()).toHaveLength(MAX_SELECTED_VERSIONS);
+  });
+
+  it("refuses a sixth version until one is turned off", () => {
+    const selected = defaultVersionIds();
+    expect(toggleVersion(selected, "web")).toEqual(selected);
+    expect(toggleVersion(selected, "ylt")).toEqual(["darby", "asv", "kjv", "dra"]);
+    expect(toggleVersion(["ylt"], "web")).toEqual(["ylt", "web"]);
+  });
+});
 
 describe("passageName", () => {
   it("expands MorphGNT abbreviations and accepts dotted references", () => {

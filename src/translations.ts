@@ -9,18 +9,32 @@
 
 export type VersionInfo = { id: string; label: string; name: string };
 
-/** In display and fetch order. The first three are the ones the tutor prompt always sees. */
+/** Most literal first, most interpretive last. */
 export const VERSIONS: VersionInfo[] = [
-  { id: "web", label: "WEB", name: "World English Bible" },
-  { id: "kjv", label: "KJV", name: "King James Version" },
-  { id: "asv", label: "ASV", name: "American Standard Version" },
   { id: "ylt", label: "YLT", name: "Young's Literal Translation" },
   { id: "darby", label: "Darby", name: "Darby Bible" },
+  { id: "asv", label: "ASV", name: "American Standard Version" },
+  { id: "kjv", label: "KJV", name: "King James Version" },
   { id: "dra", label: "DRA", name: "Douay-Rheims 1899 American Edition" },
-  { id: "bbe", label: "BBE", name: "Bible in Basic English" },
-  { id: "oeb-us", label: "OEB", name: "Open English Bible, US Edition" },
+  { id: "web", label: "WEB", name: "World English Bible" },
   { id: "webbe", label: "WEBBE", name: "World English Bible, British Edition" },
+  { id: "oeb-us", label: "OEB", name: "Open English Bible, US Edition" },
+  { id: "oeb-cw", label: "OEB-CW", name: "Open English Bible, Commonwealth Edition" },
+  { id: "bbe", label: "BBE", name: "Bible in Basic English" },
 ];
+
+export const MAX_SELECTED_VERSIONS = 5;
+
+export function defaultVersionIds(): string[] {
+  return VERSIONS.slice(0, MAX_SELECTED_VERSIONS).map((version) => version.id);
+}
+
+/** Toggle one version. A sixth selection is ignored until one is turned off. */
+export function toggleVersion(selected: readonly string[], id: string): string[] {
+  if (selected.includes(id)) return selected.filter((item) => item !== id);
+  if (selected.length >= MAX_SELECTED_VERSIONS) return [...selected];
+  return [...selected, id];
+}
 
 const BOOKS: Record<string, string> = {
   Mt: "Matthew",
@@ -257,12 +271,15 @@ export function versionTexts(ref: string, sched: Scheduler = scheduler()): Versi
 export function watchVersions(
   ref: string,
   onChange: () => void,
+  ids: readonly string[] = VERSIONS.map((version) => version.id),
   sched: Scheduler = scheduler()
 ): () => void {
   const passage = passageName(ref);
   if (!passage) return () => {};
   const owner = Symbol(ref);
+  const wanted = new Set(ids);
   for (const version of VERSIONS) {
+    if (!wanted.has(version.id)) continue;
     if (texts.has(textKey(version.id, passage))) continue;
     sched.enqueue(version.id, passage, owner, onChange);
   }
